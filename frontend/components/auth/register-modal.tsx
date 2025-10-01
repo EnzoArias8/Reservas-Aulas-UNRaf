@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from "@/components/ui/use-toast"
 import { Loader2, AlertCircle, CheckCircle } from "lucide-react"
+import { axiosClient } from "@/lib/api"
 
 interface RegisterModalProps {
   isOpen: boolean
@@ -25,7 +26,12 @@ interface RegisterModalProps {
   onRegisterSuccess?: (userData: any) => void 
 }
 
-export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onOpenLogin, onRegisterSuccess }) => {
+export const RegisterModal: React.FC<RegisterModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onOpenLogin, 
+  onRegisterSuccess 
+}) => {
   const [formData, setFormData] = useState({
     nombre: "",
     email: "",
@@ -56,13 +62,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
   const validateForm = () => {
     if (!formData.nombre.trim()) return "El nombre es requerido"
     if (!formData.email.trim()) return "El correo electrónico es requerido"
+    
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(formData.email)) return "Correo electrónico inválido"
+    
     if (!formData.password) return "La contraseña es requerida"
-    if (formData.password.length < 6) return "Contraseña muy corta"
+    if (formData.password.length < 6) return "La contraseña debe tener al menos 6 caracteres"
     if (!formData.confirmPassword) return "Confirma tu contraseña"
     if (formData.password !== formData.confirmPassword) return "Las contraseñas no coinciden"
     if (!formData.faculty.trim()) return "La facultad es requerida"
+    
     return null
   }
 
@@ -80,50 +89,61 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
     setIsLoading(true)
 
     try {
-      const res = await fetch("http://localhost:3001/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          nombre: formData.nombre,
-          email: formData.email,
-          password: formData.password,
-          faculty: formData.faculty,
-          role: formData.role,
-        }),
+      // Llamar al backend
+      const response = await axiosClient.post("/auth/register", {
+        nombre: formData.nombre,
+        email: formData.email,
+        password: formData.password,
+        faculty: formData.faculty,
+        role: formData.role,
       })
 
-      if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.message || "Error al registrarse")
-      }
+      const { data } = response.data
 
-      const data = await res.json()
+      // Guardar tokens y usuario en localStorage
+      localStorage.setItem("accessToken", data.accessToken)
+      localStorage.setItem("refreshToken", data.refreshToken)
       localStorage.setItem("currentUser", JSON.stringify({
-  ...data.user,
-  token: data.accessToken,
-}));
-
+        id: data.user._id,
+        name: data.user.nombre,
+        email: data.user.email,
+        faculty: data.user.faculty,
+        role: data.user.role,
+        isLoggedIn: true,
+      }))
 
       setSuccess("Cuenta creada exitosamente")
+      
       toast({
         title: "Registro exitoso",
-        description: "Tu cuenta ha sido creada correctamente",
+        description: `Bienvenido ${data.user.nombre}`,
         className: "bg-green-50 border-green-200 text-green-800",
       })
 
+      // Llamar callback si existe
+      if (onRegisterSuccess) {
+        onRegisterSuccess({
+          id: data.user._id,
+          name: data.user.nombre,
+          email: data.user.email,
+          faculty: data.user.faculty,
+          role: data.user.role,
+          isLoggedIn: true,
+        })
+      }
+
+      // Cerrar modal y recargar después de un momento
       setTimeout(() => {
         onClose()
-        if (onRegisterSuccess) {
-          onRegisterSuccess(data.user)
-        }
         router.refresh()
       }, 1500)
     } catch (error: any) {
-      setError(error.message || "Error en el registro")
+      const errorMessage = error.response?.data?.message || error.message || "Error al registrarse"
+      setError(errorMessage)
+      
       toast({
         title: "Error al registrarse",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
         className: "bg-red-50 border-red-200 text-red-800",
       })
@@ -160,12 +180,27 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="nombre">Nombre *</Label>
-                <Input id="nombre" name="nombre" value={formData.nombre} onChange={handleChange} disabled={isLoading} />
+                <Label htmlFor="nombre">Nombre Completo *</Label>
+                <Input 
+                  id="nombre" 
+                  name="nombre" 
+                  value={formData.nombre} 
+                  onChange={handleChange} 
+                  disabled={isLoading}
+                  placeholder="Juan Pérez"
+                />
               </div>
               <div>
                 <Label htmlFor="email">Correo electrónico *</Label>
-                <Input id="email" name="email" value={formData.email} onChange={handleChange} disabled={isLoading} />
+                <Input 
+                  id="email" 
+                  name="email" 
+                  type="email"
+                  value={formData.email} 
+                  onChange={handleChange} 
+                  disabled={isLoading}
+                  placeholder="juan@universidad.edu"
+                />
               </div>
             </div>
 
@@ -179,6 +214,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   value={formData.password}
                   onChange={handleChange}
                   disabled={isLoading}
+                  placeholder="Mínimo 6 caracteres"
                 />
               </div>
               <div>
@@ -190,6 +226,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   disabled={isLoading}
+                  placeholder="Repite tu contraseña"
                 />
               </div>
             </div>
@@ -197,11 +234,22 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="faculty">Facultad *</Label>
-                <Input id="faculty" name="faculty" value={formData.faculty} onChange={handleChange} disabled={isLoading} />
+                <Input 
+                  id="faculty" 
+                  name="faculty" 
+                  value={formData.faculty} 
+                  onChange={handleChange} 
+                  disabled={isLoading}
+                  placeholder="Ej: Ingeniería"
+                />
               </div>
               <div>
                 <Label htmlFor="role">Rol</Label>
-                <Select value={formData.role} onValueChange={(value) => handleSelectChange("role", value)} disabled={isLoading}>
+                <Select 
+                  value={formData.role} 
+                  onValueChange={(value) => handleSelectChange("role", value)} 
+                  disabled={isLoading}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona un rol" />
                   </SelectTrigger>
@@ -227,7 +275,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
             >
               Ya tengo cuenta
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+            <Button 
+              type="submit" 
+              disabled={isLoading} 
+              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700"
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

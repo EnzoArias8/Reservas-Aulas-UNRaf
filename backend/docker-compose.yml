@@ -1,0 +1,44 @@
+# ============================================
+# docker-compose.yml (OPCIONAL - para MongoDB)
+# ============================================
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: lab_reservation_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: lab_reservations
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - lab_network
+
+  mongo-express:
+    image: mongo-express
+    container_name: lab_reservation_mongo_express
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin123
+      ME_CONFIG_MONGODB_URL: mongodb://admin:admin123@mongodb:27017/
+    depends_on:
+      - mongodb
+    networks:
+      - lab_network
+
+volumes:
+  mongodb_data:
+  mongodb_config:
+
+networks:
+  lab_network:
+    driver: bridge

@@ -1,0 +1,18 @@
+# ============================================
+# VERIFICACIÓN DE INSTALACIÓN
+# ============================================
+
+# 1. Verificar Node.js
+node --version  # debe ser v18 o superior
+
+# 2. Verificar npm
+npm --version
+
+# 3. Verificar MongoDB
+mongosh --eval "db.version()"
+
+# 4. Verificar que el servidor inicie
+npm run dev
+
+# 5. Probar endpoint de salud
+curl http://localhost:3001/health

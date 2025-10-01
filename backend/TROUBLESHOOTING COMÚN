@@ -1,0 +1,22 @@
+# ============================================
+# TROUBLESHOOTING COMÚN
+# ============================================
+
+# Error: Cannot find module
+# Solución: npm install
+
+# Error: Port 3001 already in use
+# Solución: Cambiar PORT en .env o matar proceso
+# lsof -ti:3001 | xargs kill -9
+
+# Error: MongoDB connection failed
+# Solución: 
+# - Verificar que MongoDB esté corriendo
+# - Revisar MONGODB_URI en .env
+# - Si usa Docker: docker-compose up -d
+
+# Error: JWT must be provided
+# Solución: Incluir Authorization header o estar en ruta pública
+
+# Error: ValidationError
+# Solución: Revisar los datos enviados en el body
