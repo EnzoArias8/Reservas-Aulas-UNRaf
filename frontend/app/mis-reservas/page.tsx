@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "../../components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs"
+import { Badge } from "../../components/ui/badge"
+import { Separator } from "../../components/ui/separator"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,11 +15,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { toast } from "@/components/ui/use-toast"
-import { Toaster } from "@/components/ui/toaster"
+} from "../../components/ui/alert-dialog"
+
+import { Toaster } from "../../components/ui/toaster"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
+import { useUserReservations, useCancelReservation } from "../../lib/hooks/useReservations" // Corregido: ruta relativa
+import { useAuth } from "../../lib/hooks/useAuth" // Corregido: usar ruta relativa (antes alias "@/...")
+import { Reservation } from "../../lib/types" // Corregido: ruta relativa
 import {
   CalendarIcon,
   ClockIcon,
@@ -32,151 +34,45 @@ import {
   AlertCircle,
   Clock,
   Calendar,
+  Loader2,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
-// Tipo para las reservas
-interface Reservation {
-  id: string
-  labId: string
-  date: string // formato YYYY-MM-DD
-  timeSlot: string
-  purpose: string
-  attendees: string
-  labName?: string
-  building?: string
-  floor?: string
-  userId?: string
-}
-
 export default function MisReservasPage() {
-  const [reservations, setReservations] = useState<Reservation[]>([])
-  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null)
-  const [currentUser, setCurrentUser] = useState<any>(null)
   const router = useRouter()
-
-  // Datos de laboratorios
-  const labs = [
-    {
-      id: "chem-101",
-      name: "Laboratorio de Química 101",
-      building: "Edificio de Ciencias",
-      floor: "1er Piso",
-    },
-    {
-      id: "phys-202",
-      name: "Laboratorio de Física 202",
-      building: "Edificio de Ingeniería",
-      floor: "2do Piso",
-    },
-    {
-      id: "bio-103",
-      name: "Laboratorio de Biología 103",
-      building: "Edificio de Ciencias de la Vida",
-      floor: "1er Piso",
-    },
-    {
-      id: "comp-301",
-      name: "Laboratorio de Informática 301",
-      building: "Edificio de Tecnología",
-      floor: "3er Piso",
-    },
-  ]
-
-  // Cargar usuario actual
-  useEffect(() => {
-    const storedUser = localStorage.getItem("currentUser")
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser)
-        setCurrentUser(userData)
-      } catch (error) {
-        console.error("Error parsing user data:", error)
-      }
-    } else {
-      // Redirigir si no hay usuario autenticado
-      router.push("/")
-    }
-  }, [router])
-
-  // Cargar reservas del localStorage
-  useEffect(() => {
-    if (!currentUser) return
-
-    const savedReservations = localStorage.getItem("labReservations")
-    if (savedReservations) {
-      const parsedReservations = JSON.parse(savedReservations)
-
-      // Filtrar reservas del usuario actual
-      const userReservations = parsedReservations.filter(
-        (res: Reservation) => !res.userId || res.userId === currentUser.id,
-      )
-
-      // Enriquecer las reservas con información del laboratorio
-      const enrichedReservations = userReservations.map((reservation: Reservation) => {
-        const lab = labs.find((lab) => lab.id === reservation.labId)
-        return {
-          ...reservation,
-          labName: lab?.name,
-          building: lab?.building,
-          floor: lab?.floor,
-          userId: reservation.userId || currentUser.id, // Asegurar que tenga userId
-        }
-      })
-
-      setReservations(enrichedReservations)
-    }
-  }, [currentUser])
-
-  // Función para cancelar una reserva
-  const cancelReservation = (id: string) => {
-    // Obtener todas las reservas
-    const savedReservations = localStorage.getItem("labReservations")
-    if (savedReservations) {
-      const allReservations = JSON.parse(savedReservations)
-
-      // Filtrar la reserva a cancelar
-      const updatedAllReservations = allReservations.filter((res: Reservation) => res.id !== id)
-
-      // Guardar todas las reservas actualizadas
-      localStorage.setItem("labReservations", JSON.stringify(updatedAllReservations))
-
-      // Actualizar el estado local
-      const updatedUserReservations = reservations.filter((res) => res.id !== id)
-      setReservations(updatedUserReservations)
-
-      toast({
-        title: "Reserva cancelada",
-        description: "Tu reserva ha sido cancelada correctamente.",
-      })
-    }
-  }
+  const { user, isLoading: isAuthLoading } = useAuth()
+  const { data, isLoading, error } = useUserReservations({ enabled: !!user })
+  const { mutate: cancelReservation, isPending: isCancelling } = useCancelReservation()
 
   // Función para editar una reserva (redirige a la página principal con datos precargados)
   const editReservation = (reservation: Reservation) => {
-    // En una aplicación real, aquí pasaríamos los datos a través de un estado global o parámetros
-    // Por ahora, simplemente redirigimos a la página principal
-    router.push("/")
-
-    toast({
-      title: "Editar reserva",
-      description: "Serás redirigido para editar tu reserva.",
-    })
+    // Redirige a la página de edición dedicada con el ID de la reserva
+    router.push(`/reservar?edit=${reservation._id}`)
   }
 
   // Filtrar reservas por pasadas y próximas
-  const today = new Date().toISOString().split("T")[0]
-  const upcomingReservations = reservations.filter((res) => res.date >= today)
-  const pastReservations = reservations.filter((res) => res.date < today)
+  const upcomingReservations = data?.upcoming || []
+  const pastReservations = data?.past || []
 
   // Verificar si una reserva puede ser editada (solo si es futura)
   const canEditReservation = (date: string) => {
-    return date >= today
+    const reservationDate = parseISO(date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Asegurar que comparamos solo la fecha, no la hora
+    return reservationDate >= today
   }
 
   // Si no hay usuario, mostrar mensaje
-  if (!currentUser) {
+  if (isAuthLoading) {
+    return (
+      <div className="container py-10 flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user) {
     return (
       <div className="container py-10">
         <Toaster />
@@ -196,12 +92,30 @@ export default function MisReservasPage() {
     )
   }
 
+  if (isLoading && !data) {
+    return (
+      <div className="container py-10">
+        <h1 className="text-3xl font-bold mb-6">Mis Reservas</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Skeleton Loaders */}
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="h-64 animate-pulse bg-muted"></Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return <div className="container py-10 text-destructive">Error al cargar las reservas: {error.message}</div>
+  }
+
   return (
     <div className="container py-10">
       <Toaster />
       <h1 className="text-3xl font-bold mb-6">Mis Reservas</h1>
 
-      {reservations.length === 0 ? (
+      {upcomingReservations.length === 0 && pastReservations.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-10">
             <div className="rounded-full bg-yellow-100 p-3 mb-4">
@@ -247,19 +161,19 @@ export default function MisReservasPage() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {upcomingReservations.map((reservation) => (
-                  <Card key={reservation.id} className="overflow-hidden">
+                {upcomingReservations.map((reservation: Reservation) => (
+                  <Card key={reservation._id} className="overflow-hidden border border-blue-200 dark:border-blue-800">
                     <CardHeader className="bg-slate-50 dark:bg-slate-800 pb-4">
                       <div className="flex justify-between items-start">
                         <div>
                           <CardTitle className="flex items-center gap-2">
                             <FlaskConical className="h-5 w-5 text-primary" />
-                            {reservation.labName}
+                            {reservation.lab?.name}
                           </CardTitle>
                           <CardDescription className="mt-1">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-3.5 w-3.5" />
-                              {reservation.building}, {reservation.floor}
+                              {reservation.lab?.building}, {reservation.lab?.floor}
                             </div>
                           </CardDescription>
                         </div>
@@ -298,7 +212,7 @@ export default function MisReservasPage() {
                         <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm">
                             <Trash2 className="h-4 w-4 mr-1" />
-                            Cancelar
+                            {isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancelar"}
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
@@ -311,7 +225,7 @@ export default function MisReservasPage() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>No, mantener reserva</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => cancelReservation(reservation.id)}>
+                            <AlertDialogAction onClick={() => cancelReservation(reservation._id)}>
                               Sí, cancelar reserva
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -352,19 +266,19 @@ export default function MisReservasPage() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {pastReservations.map((reservation) => (
-                  <Card key={reservation.id} className="overflow-hidden opacity-80">
+                {pastReservations.map((reservation: Reservation) => (
+                  <Card key={reservation._id} className="overflow-hidden opacity-80">
                     <CardHeader className="bg-slate-50 dark:bg-slate-800 pb-4">
                       <div className="flex justify-between items-start">
                         <div>
                           <CardTitle className="flex items-center gap-2">
                             <FlaskConical className="h-5 w-5 text-muted-foreground" />
-                            {reservation.labName}
+                            {reservation.lab?.name}
                           </CardTitle>
                           <CardDescription className="mt-1">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-3.5 w-3.5" />
-                              {reservation.building}, {reservation.floor}
+                              {reservation.lab?.building}, {reservation.lab?.floor}
                             </div>
                           </CardDescription>
                         </div>

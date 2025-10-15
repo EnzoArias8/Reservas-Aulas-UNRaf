@@ -13,7 +13,7 @@ export interface User {
 }
 
 export interface Lab {
-  id: string
+  _id: string
   name: string
   building: string
   floor: string
@@ -26,18 +26,14 @@ export interface Lab {
 }
 
 export interface Reservation {
-  id: string
-  userId: string
-  labId: string
+  _id: string
   date: string // YYYY-MM-DD
   timeSlot: string
   purpose: string
   attendees: number
   status: "pending" | "confirmed" | "cancelled" | "completed"
   createdAt: string
-  updatedAt: string
-  // Relaciones
-  user?: User
+  // Relaciones pobladas por el backend
   lab?: Lab
 }
 

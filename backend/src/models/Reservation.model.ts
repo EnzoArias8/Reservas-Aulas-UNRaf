@@ -1,4 +1,3 @@
-
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IReservation extends Document {
@@ -48,7 +47,7 @@ const reservationSchema = new Schema<IReservation>(
     status: {
       type: String,
       enum: ['pending', 'confirmed', 'cancelled', 'completed'],
-      default: 'confirmed'
+      default: 'pending' // Cambiado de 'confirmed' a 'pending'
     }
   },
   {

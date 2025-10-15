@@ -5,15 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { CalendarIcon, CheckCircle, ClockIcon, FlaskConical, Users, Copy } from "lucide-react"
-
-interface Lab {
-  id: string
-  name: string
-  building: string
-  floor: string
-  capacity: number
-  equipment: string[]
-}
+import { Lab } from "@/lib/types"
 
 interface ReservationConfirmationProps {
   lab: Lab | undefined
@@ -21,6 +13,7 @@ interface ReservationConfirmationProps {
   timeSlot: string
   purpose: string
   attendees: string
+  reservationId: string // Recibe el ID real desde el backend
   onClose: () => void
 }
 
@@ -30,11 +23,10 @@ export function ReservationConfirmation({
   timeSlot,
   purpose,
   attendees,
+  reservationId,
   onClose,
 }: ReservationConfirmationProps) {
   if (!lab) return null
-
-  const reservationId = `RES-${Math.floor(100000 + Math.random() * 900000)}`
 
   return (
     <div className="flex justify-center items-center">

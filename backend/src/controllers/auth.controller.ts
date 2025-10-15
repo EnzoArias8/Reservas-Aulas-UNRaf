@@ -36,7 +36,7 @@ export const register = async (
     });
 
     // Generar tokens y enviar respuesta
-    sendTokenResponse(user, 201, res);
+    sendTokenResponse(user as InstanceType<typeof User> & { _id: string }, 201, res);
   } catch (error) {
     next(error);
   }
@@ -88,7 +88,7 @@ export const logout = async (
   try {
     // Limpiar refresh token del usuario
     if (req.user) {
-      await User.findByIdAndUpdate(req.user._id, { refreshToken: undefined });
+      await User.findByIdAndUpdate(req.user.id, { refreshToken: undefined });
     }
 
     // Limpiar cookies
@@ -118,7 +118,11 @@ export const getMe = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const user = await User.findById(req.user._id);
+    if (!req.user) {
+      throw new AppError('No autorizado', 401);
+    }
+
+    const user = await User.findById(req.user.id);
 
     res.status(200).json({
       success: true,
@@ -145,8 +149,12 @@ export const updateProfile = async (
       }
     });
 
+    if (!req.user) {
+      throw new AppError('No autorizado', 401);
+    }
+
     const user = await User.findByIdAndUpdate(
-      req.user._id,
+      req.user.id,
       updates,
       {
         new: true,
@@ -172,7 +180,11 @@ export const changePassword = async (
   try {
     const { currentPassword, newPassword } = req.body;
 
-    const user = await User.findById(req.user._id).select('+password');
+    if (!req.user) {
+      throw new AppError('No autorizado', 401);
+    }
+
+    const user = await User.findById(req.user.id).select('+password');
 
     if (!user) {
       throw new AppError('Usuario no encontrado', 404);
