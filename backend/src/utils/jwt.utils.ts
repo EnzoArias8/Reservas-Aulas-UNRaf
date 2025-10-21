@@ -6,23 +6,23 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/User.model';
 
 export const generateAccessToken = (userId: string): string => {
-  const secret: jwt.Secret = process.env.JWT_SECRET as string;
+  const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error('JWT_SECRET no está definido en las variables de entorno');
   }
-  return jwt.sign({ id: userId }, secret, {
-    expiresIn: process.env.JWT_EXPIRE || '15m'
-  });
+  const payload = { id: userId };
+  const options: jwt.SignOptions = { expiresIn: '15m' };
+  return jwt.sign(payload, secret, options);
 };
 
 export const generateRefreshToken = (userId: string): string => {
-  const refreshSecret: jwt.Secret = process.env.JWT_REFRESH_SECRET as string;
+  const refreshSecret = process.env.JWT_REFRESH_SECRET;
   if (!refreshSecret) {
     throw new Error('JWT_REFRESH_SECRET no está definido en las variables de entorno');
   }
-  return jwt.sign({ id: userId }, refreshSecret, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d'
-  });
+  const payload = { id: userId };
+  const options: jwt.SignOptions = { expiresIn: '7d' };
+  return jwt.sign(payload, refreshSecret, options);
 };
 
 export const sendTokenResponse = (

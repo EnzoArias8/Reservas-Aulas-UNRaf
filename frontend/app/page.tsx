@@ -330,9 +330,9 @@ export default function LabReservationPage() {
             }}
           />
         ) : (
-          <div className="backdrop-blur-sm bg-white/70 dark:bg-slate-800/70 rounded-2xl border border-white/20 shadow-xl">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 m-6 mb-0 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-slate-700 dark:to-slate-600">
+          <div className="backdrop-blur-sm bg-white/70 dark:bg-slate-800/70 rounded-2xl border border-white/20 shadow-xl mx-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col items-center">
+              <TabsList className="grid grid-cols-2 mx-auto mt-6 mb-0 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-slate-700 dark:to-slate-600" style={{ width: '1450px' }}>
                 <TabsTrigger
                   value="browse"
                   className="data-[state=active]:bg-white data-[state=active]:text-blue-600 font-medium"
