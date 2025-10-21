@@ -18,8 +18,7 @@ const labSchema = new Schema<ILab>(
     name: {
       type: String,
       required: [true, 'El nombre del laboratorio es requerido'],
-      trim: true,
-      unique: true
+      trim: true
     },
     building: {
       type: String,
@@ -57,7 +56,8 @@ const labSchema = new Schema<ILab>(
 );
 
 // Índices
-labSchema.index({ name: 1 });
+// Índice compuesto: el nombre debe ser único dentro de cada edificio
+labSchema.index({ name: 1, building: 1 }, { unique: true });
 labSchema.index({ building: 1 });
 
 export const Lab = mongoose.model<ILab>('Lab', labSchema);

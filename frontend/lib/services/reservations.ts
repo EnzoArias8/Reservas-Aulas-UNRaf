@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api"
+import { axiosClient } from "@/lib/api"
 import type {
   Reservation,
   CreateReservationRequest,
@@ -9,8 +9,8 @@ import type {
 
 export class ReservationService {
   static async createReservation(reservationData: CreateReservationRequest): Promise<Reservation> {
-    const response = await apiClient.post<ApiResponse<Reservation>>("/reservations", reservationData)
-    return response.data
+    const response = await axiosClient.post("/reservations", reservationData)
+    return response.data?.data || response.data
   }
 
   static async getReservations(filters?: ReservationFilters): Promise<Reservation[]> {
@@ -27,31 +27,33 @@ export class ReservationService {
     const queryString = params.toString()
     const endpoint = queryString ? `/reservations?${queryString}` : "/reservations"
 
-    const response = await apiClient.get<ApiResponse<Reservation[]>>(endpoint)
-    return response.data
+    const response = await axiosClient.get(endpoint)
+    return response.data?.data || response.data
   }
 
   static async getReservationById(id: string): Promise<Reservation> {
-    const response = await apiClient.get<ApiResponse<Reservation>>(`/reservations/${id}`)
-    return response.data
+    console.log("🔍 Fetching reservation with ID:", id)
+    const response = await axiosClient.get(`/reservations/${id}`)
+    console.log("📦 Reservation response:", response.data)
+    return response.data?.data || response.data
   }
 
   static async updateReservation(id: string, updates: UpdateReservationRequest): Promise<Reservation> {
-    const response = await apiClient.put<ApiResponse<Reservation>>(`/reservations/${id}`, updates)
-    return response.data
+    const response = await axiosClient.put(`/reservations/${id}`, updates)
+    return response.data?.data || response.data
   }
 
   static async cancelReservation(id: string): Promise<void> {
-    await apiClient.put(`/reservations/${id}/cancel`)
+    await axiosClient.put(`/reservations/${id}/cancel`)
   }
 
   static async deleteReservation(id: string): Promise<void> {
-    await apiClient.delete(`/reservations/${id}`)
+    await axiosClient.delete(`/reservations/${id}`)
   }
 
   static async getUserReservations(userId?: string): Promise<Reservation[]> {
     const endpoint = userId ? `/reservations/user/${userId}` : "/reservations/me"
-    const response = await apiClient.get<ApiResponse<Reservation[]>>(endpoint)
-    return response.data
+    const response = await axiosClient.get(endpoint)
+    return response.data?.data || response.data
   }
 }

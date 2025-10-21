@@ -38,15 +38,18 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { AuthService } from "@/lib/services/auth"
 
 interface UserData {
-  id: string
-  name: string
+  _id: string
+  nombre: string
+  apellido: string
   email: string
-  isLoggedIn: boolean
-  faculty?: string
   role?: string
-  registrationDate?: string
+  telefono?: string
+  isActive?: boolean
+  createdAt?: string
+  updatedAt?: string
   [key: string]: any
 }
 
@@ -54,20 +57,42 @@ export default function PerfilPage() {
   const [userData, setUserData] = useState<UserData | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<UserData | null>(null)
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  })
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
   const router = useRouter()
 
   // Cargar datos del usuario
   useEffect(() => {
-    const storedUser = localStorage.getItem("currentUser")
-    if (storedUser) {
+    const loadUserData = async () => {
       try {
-        const parsedUser = JSON.parse(storedUser)
-        setUserData(parsedUser)
-        setFormData(parsedUser)
+        // Cargar datos actualizados desde el backend
+        const user = await AuthService.getCurrentUser()
+        setUserData(user)
+        setFormData(user)
+        
+        // Actualizar localStorage con los datos más recientes
+        localStorage.setItem("currentUser", JSON.stringify(user))
       } catch (error) {
-        console.error("Error parsing user data:", error)
+        console.error("Error loading user data:", error)
+        // Fallback a localStorage si falla la llamada al backend
+        const storedUser = localStorage.getItem("currentUser")
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser)
+            setUserData(parsedUser)
+            setFormData(parsedUser)
+          } catch (parseError) {
+            console.error("Error parsing stored user data:", parseError)
+          }
+        }
       }
     }
+
+    loadUserData()
   }, [])
 
   // Redirigir si no hay usuario autenticado
@@ -85,23 +110,103 @@ export default function PerfilPage() {
     setFormData((prev) => (prev ? { ...prev, [name]: value } : null))
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData) return
 
-    setUserData(formData)
-    localStorage.setItem("currentUser", JSON.stringify(formData))
-    setIsEditing(false)
+    try {
+      // Enviar cambios al backend
+      const updatedUser = await AuthService.updateProfile({
+        nombre: formData.nombre,
+        apellido: formData.apellido,
+        telefono: formData.telefono
+      })
 
-    toast({
-      title: "Perfil actualizado",
-      description: "Tus datos personales han sido actualizados correctamente.",
-      className: "bg-green-50 border-green-200 text-green-800",
-    })
+      // Actualizar el estado local
+      setUserData(updatedUser)
+      localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+      setIsEditing(false)
+
+      toast({
+        title: "Perfil actualizado",
+        description: "Tus datos personales han sido actualizados correctamente.",
+        className: "bg-green-50 border-green-200 text-green-800",
+      })
+    } catch (error: any) {
+      console.error('Error al actualizar perfil:', error)
+      toast({
+        title: "Error al actualizar perfil",
+        description: error?.response?.data?.message || "No se pudo actualizar el perfil",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleCancel = () => {
     setFormData(userData)
     setIsEditing(false)
+  }
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setPasswordData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleChangePassword = async () => {
+    // Validaciones
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      toast({
+        title: "Campos requeridos",
+        description: "Por favor, completa todos los campos.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: "Contraseñas no coinciden",
+        description: "La nueva contraseña y la confirmación no coinciden.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast({
+        title: "Contraseña muy corta",
+        description: "La nueva contraseña debe tener al menos 6 caracteres.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsChangingPassword(true)
+
+    try {
+      await AuthService.changePassword(passwordData.currentPassword, passwordData.newPassword)
+      
+      // Limpiar los campos
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      })
+
+      toast({
+        title: "Contraseña actualizada",
+        description: "Tu contraseña ha sido cambiada exitosamente.",
+        className: "bg-green-50 border-green-200 text-green-800",
+      })
+    } catch (error: any) {
+      console.error('Error al cambiar contraseña:', error)
+      toast({
+        title: "Error al cambiar contraseña",
+        description: error?.response?.data?.message || "No se pudo cambiar la contraseña",
+        variant: "destructive",
+      })
+    } finally {
+      setIsChangingPassword(false)
+    }
   }
 
   const handleLogout = () => {
@@ -167,12 +272,12 @@ export default function PerfilPage() {
               <CardHeader className="pb-4">
                 <div className="flex flex-col items-center">
                   <Avatar className="h-24 w-24 mb-4 ring-4 ring-blue-100 dark:ring-blue-900">
-                    <AvatarImage src="/placeholder.svg?height=96&width=96" alt={userData.name} />
+                    <AvatarImage src="/placeholder.svg?height=96&width=96" alt={`${userData.nombre} ${userData.apellido}`} />
                     <AvatarFallback className="text-2xl bg-gradient-to-br from-blue-500 to-purple-500 text-white">
-                      {userData?.name?.charAt(0) ?? "U"}
+                      {userData?.nombre?.charAt(0) ?? "U"}
                     </AvatarFallback>
                   </Avatar>
-                  <CardTitle className="text-center text-xl">{userData.name}</CardTitle>
+                  <CardTitle className="text-center text-xl">{userData.nombre} {userData.apellido}</CardTitle>
                   <CardDescription className="text-center">{userData.email}</CardDescription>
                 </div>
               </CardHeader>
@@ -191,19 +296,12 @@ export default function PerfilPage() {
                   <Separator />
 
                   <div className="space-y-2">
-                    {userData.faculty && (
-                      <div className="flex items-center text-sm">
-                        <School className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span className="text-muted-foreground">Facultad:</span>
-                        <span className="ml-auto font-medium">{userData.faculty}</span>
-                      </div>
-                    )}
-                    {userData.registrationDate && (
+                    {userData.createdAt && (
                       <div className="flex items-center text-sm">
                         <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                         <span className="text-muted-foreground">Registro:</span>
                         <span className="ml-auto font-medium">
-                          {new Date(userData.registrationDate).toLocaleDateString("es-ES")}
+                          {new Date(userData.createdAt).toLocaleDateString("es-ES")}
                         </span>
                       </div>
                     )}
@@ -295,14 +393,29 @@ export default function PerfilPage() {
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="name" className="font-medium">
+                          <Label htmlFor="nombre" className="font-medium">
                             <User className="h-4 w-4 inline mr-2" />
-                            Nombre Completo
+                            Nombre
                           </Label>
                           <Input
-                            id="name"
-                            name="name"
-                            value={formData?.name || ""}
+                            id="nombre"
+                            name="nombre"
+                            value={formData?.nombre || ""}
+                            onChange={handleChange}
+                            disabled={!isEditing}
+                            className="bg-white dark:bg-slate-800"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="apellido" className="font-medium">
+                            <User className="h-4 w-4 inline mr-2" />
+                            Apellido
+                          </Label>
+                          <Input
+                            id="apellido"
+                            name="apellido"
+                            value={formData?.apellido || ""}
                             onChange={handleChange}
                             disabled={!isEditing}
                             className="bg-white dark:bg-slate-800"
@@ -340,53 +453,6 @@ export default function PerfilPage() {
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="faculty" className="font-medium">
-                            <School className="h-4 w-4 inline mr-2" />
-                            Facultad
-                          </Label>
-                          <Input
-                            id="faculty"
-                            name="faculty"
-                            value={formData?.faculty || ""}
-                            onChange={handleChange}
-                            disabled={!isEditing}
-                            placeholder={isEditing ? "Ingresa tu facultad" : "No especificado"}
-                            className="bg-white dark:bg-slate-800"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="carrera" className="font-medium">
-                            <GraduationCap className="h-4 w-4 inline mr-2" />
-                            Carrera
-                          </Label>
-                          <Input
-                            id="carrera"
-                            name="carrera"
-                            value={formData?.carrera || ""}
-                            onChange={handleChange}
-                            disabled={!isEditing}
-                            placeholder={isEditing ? "Ingresa tu carrera" : "No especificado"}
-                            className="bg-white dark:bg-slate-800"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="semestre" className="font-medium">
-                            <BookOpen className="h-4 w-4 inline mr-2" />
-                            Semestre
-                          </Label>
-                          <Input
-                            id="semestre"
-                            name="semestre"
-                            value={formData?.semestre || ""}
-                            onChange={handleChange}
-                            disabled={!isEditing}
-                            placeholder={isEditing ? "Ingresa tu semestre" : "No especificado"}
-                            className="bg-white dark:bg-slate-800"
-                          />
-                        </div>
                       </div>
                     </CardContent>
                     <CardFooter className="flex justify-end gap-2">
@@ -431,7 +497,10 @@ export default function PerfilPage() {
                         </Label>
                         <Input
                           id="current-password"
+                          name="currentPassword"
                           type="password"
+                          value={passwordData.currentPassword}
+                          onChange={handlePasswordChange}
                           className="bg-white dark:bg-slate-800"
                           placeholder="Ingresa tu contraseña actual"
                         />
@@ -443,7 +512,10 @@ export default function PerfilPage() {
                         </Label>
                         <Input
                           id="new-password"
+                          name="newPassword"
                           type="password"
+                          value={passwordData.newPassword}
+                          onChange={handlePasswordChange}
                           className="bg-white dark:bg-slate-800"
                           placeholder="Ingresa tu nueva contraseña"
                         />
@@ -455,15 +527,22 @@ export default function PerfilPage() {
                         </Label>
                         <Input
                           id="confirm-password"
+                          name="confirmPassword"
                           type="password"
+                          value={passwordData.confirmPassword}
+                          onChange={handlePasswordChange}
                           className="bg-white dark:bg-slate-800"
                           placeholder="Confirma tu nueva contraseña"
                         />
                       </div>
                     </CardContent>
                     <CardFooter>
-                      <Button className="bg-gradient-to-r from-yellow-600 to-yellow-600 hover:from-yellow-700 hover:to-yellow-700">
-                        Cambiar Contraseña
+                      <Button 
+                        onClick={handleChangePassword}
+                        disabled={isChangingPassword}
+                        className="bg-gradient-to-r from-yellow-600 to-yellow-600 hover:from-yellow-700 hover:to-yellow-700 disabled:opacity-50"
+                      >
+                        {isChangingPassword ? "Cambiando..." : "Cambiar Contraseña"}
                       </Button>
                     </CardFooter>
                   </Card>

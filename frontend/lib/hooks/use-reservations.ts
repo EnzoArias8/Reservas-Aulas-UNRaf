@@ -81,3 +81,11 @@ export const useDeleteReservation = () => {
     },
   })
 }
+
+export const useReservationById = (id: string | null) => {
+  return useQuery({
+    queryKey: ["reservation", id],
+    queryFn: () => ReservationService.getReservationById(id!),
+    enabled: !!id,
+  })
+}

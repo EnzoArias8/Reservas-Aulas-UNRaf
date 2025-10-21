@@ -5,9 +5,9 @@ export interface IReservation extends Document {
   labId: mongoose.Types.ObjectId;
   date: Date;
   timeSlot: string;
-  purpose: string;
+  purpose?: string;
   attendees: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: 'confirmed' | 'completed';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,7 +35,7 @@ const reservationSchema = new Schema<IReservation>(
     },
     purpose: {
       type: String,
-      required: [true, 'El propósito es requerido'],
+      required: false,
       trim: true,
       maxlength: [500, 'El propósito no puede exceder 500 caracteres']
     },
@@ -46,8 +46,8 @@ const reservationSchema = new Schema<IReservation>(
     },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'cancelled', 'completed'],
-      default: 'pending' // Cambiado de 'confirmed' a 'pending'
+      enum: ['confirmed', 'completed'],
+      default: 'confirmed'
     }
   },
   {

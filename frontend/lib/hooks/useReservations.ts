@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react"
 import { parseISO, isBefore } from "date-fns"
 import type { Reservation } from "../types"
+import { axiosClient } from "../api"
+import { ReservationService } from "../services/reservations"
 
 type ReservationsResponse = {
   upcoming: Reservation[]
@@ -21,13 +23,9 @@ export function useUserReservations(options?: { enabled?: boolean }) {
       setIsLoading(true)
       setError(null)
       try {
-        // Ajusta la URL según tu backend
-        const res = await fetch("/api/reservations/me", {
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const items: Reservation[] = await res.json()
+        // Usar axiosClient que incluye el token automáticamente
+        const res = await axiosClient.get("/reservations/me")
+        const items: Reservation[] = res.data?.data || res.data || []
 
         // Separar próximas y pasadas según la fecha
         const today = new Date()
@@ -65,17 +63,8 @@ export function useCancelReservation() {
   const mutate = useCallback(async (reservationId: string) => {
     setIsPending(true)
     try {
-      // Ajusta la URL/metodo según tu API (aquí usamos DELETE en endpoint REST)
-      const res = await fetch(`/api/reservations/${reservationId}`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `HTTP ${res.status}`)
-      }
-      // opcional: devolver el resultado o true
+      // Usar axiosClient para DELETE
+      await axiosClient.delete(`/reservations/${reservationId}`)
       return true
     } catch (e) {
       throw e
@@ -85,4 +74,46 @@ export function useCancelReservation() {
   }, [])
 
   return { mutate, isPending }
+}
+
+export function useReservationById(id: string | null) {
+  const [data, setData] = useState<Reservation | undefined>(undefined)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [error, setError] = useState<Error | null>(null)
+
+  useEffect(() => {
+    if (!id) {
+      setData(undefined)
+      return
+    }
+
+    let cancelled = false
+
+    async function fetchReservation() {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const reservation = await ReservationService.getReservationById(id)
+        if (!cancelled) {
+          setData(reservation)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err : new Error('Error al cargar la reserva'))
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    fetchReservation()
+
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  return { data, isLoading, error }
 }

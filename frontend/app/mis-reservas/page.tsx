@@ -43,12 +43,15 @@ export default function MisReservasPage() {
   const router = useRouter()
   const { user, isLoading: isAuthLoading } = useAuth()
   const { data, isLoading, error } = useUserReservations({ enabled: !!user })
+  
+  // Debug: Log de las reservas para verificar los datos
+  console.log('Reservas del usuario:', data)
   const { mutate: cancelReservation, isPending: isCancelling } = useCancelReservation()
 
   // Función para editar una reserva (redirige a la página principal con datos precargados)
   const editReservation = (reservation: Reservation) => {
-    // Redirige a la página de edición dedicada con el ID de la reserva
-    router.push(`/reservar?edit=${reservation._id}`)
+    // Redirige a la página principal con el ID de la reserva para editar
+    router.push(`/?edit=${reservation._id}`)
   }
 
   // Filtrar reservas por pasadas y próximas
@@ -168,12 +171,12 @@ export default function MisReservasPage() {
                         <div>
                           <CardTitle className="flex items-center gap-2">
                             <FlaskConical className="h-5 w-5 text-primary" />
-                            {reservation.lab?.name}
+                            {reservation.labId?.name || reservation.lab?.name || 'Laboratorio no especificado'}
                           </CardTitle>
                           <CardDescription className="mt-1">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-3.5 w-3.5" />
-                              {reservation.lab?.building}, {reservation.lab?.floor}
+                              {reservation.labId?.building || reservation.lab?.building || 'N/A'}, {reservation.labId?.floor || reservation.lab?.floor || 'N/A'}
                             </div>
                           </CardDescription>
                         </div>
@@ -215,18 +218,48 @@ export default function MisReservasPage() {
                             {isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancelar"}
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent>
+                        <AlertDialogContent className="sm:max-w-[500px]">
                           <AlertDialogHeader>
-                            <AlertDialogTitle>¿Cancelar esta reserva?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción no se puede deshacer. ¿Estás seguro de que deseas cancelar tu reserva para el{" "}
-                              {format(parseISO(reservation.date), "d 'de' MMMM", { locale: es })}?
-                            </AlertDialogDescription>
+                            <AlertDialogTitle>¿Está seguro que quiere cancelar esta reserva?</AlertDialogTitle>
                           </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>No, mantener reserva</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => cancelReservation(reservation._id)}>
-                              Sí, cancelar reserva
+                          
+                          {/* Datos de la reserva */}
+                          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                            <div className="flex justify-between">
+                              <span className="font-medium">Aula/Laboratorio:</span>
+                              <span>{reservation.labId?.name || reservation.lab?.name || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="font-medium">Edificio:</span>
+                              <span>{reservation.labId?.building || reservation.lab?.building || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="font-medium">Fecha:</span>
+                              <span>{format(parseISO(reservation.date), "d 'de' MMMM 'de' yyyy", { locale: es })}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="font-medium">Horario:</span>
+                              <span>{reservation.timeSlot}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="font-medium">Asistentes:</span>
+                              <span>{reservation.attendees}</span>
+                            </div>
+                            {reservation.purpose && (
+                              <div className="flex justify-between">
+                                <span className="font-medium">Propósito:</span>
+                                <span className="text-right max-w-[200px] break-words">{reservation.purpose}</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                            <AlertDialogCancel className="w-full sm:w-auto">No, mantener reserva</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => cancelReservation(reservation._id)}
+                              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white"
+                            >
+                              Cancelar reserva
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -273,12 +306,12 @@ export default function MisReservasPage() {
                         <div>
                           <CardTitle className="flex items-center gap-2">
                             <FlaskConical className="h-5 w-5 text-muted-foreground" />
-                            {reservation.lab?.name}
+                            {reservation.labId?.name || reservation.lab?.name || 'Laboratorio no especificado'}
                           </CardTitle>
                           <CardDescription className="mt-1">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-3.5 w-3.5" />
-                              {reservation.lab?.building}, {reservation.lab?.floor}
+                              {reservation.labId?.building || reservation.lab?.building || 'N/A'}, {reservation.labId?.floor || reservation.lab?.floor || 'N/A'}
                             </div>
                           </CardDescription>
                         </div>

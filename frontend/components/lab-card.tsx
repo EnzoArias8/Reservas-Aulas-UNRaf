@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Building2, Monitor, Users, Check } from "lucide-react"
 
 interface Lab {
-  id: string
+  _id: string
   name: string
   building: string
   floor: string

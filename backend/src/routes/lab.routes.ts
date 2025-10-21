@@ -31,8 +31,8 @@ router.get('/:id/available-slots', getAvailableTimeSlots);
 
 // Rutas protegidas solo para admin
 router.use(protect);
-router.post('/', authorize('Admin', 'Profesor'), labValidation, createLab);
-router.put('/:id', authorize('Admin', 'Profesor'), updateLab);
+router.post('/', authorize('Admin'), labValidation, createLab);
+router.put('/:id', authorize('Admin'), updateLab);
 router.delete('/:id', authorize('Admin'), deleteLab);
 
 export default router;

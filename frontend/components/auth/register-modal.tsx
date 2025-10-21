@@ -34,11 +34,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     nombre: "",
+    apellido: "",
     email: "",
     password: "",
     confirmPassword: "",
-    faculty: "",
-    role: "Estudiante",
+    role: "Profesor",
   })
 
   const [isLoading, setIsLoading] = useState(false)
@@ -61,6 +61,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
   const validateForm = () => {
     if (!formData.nombre.trim()) return "El nombre es requerido"
+    if (!formData.apellido.trim()) return "El apellido es requerido"
     if (!formData.email.trim()) return "El correo electrónico es requerido"
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -70,7 +71,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     if (formData.password.length < 6) return "La contraseña debe tener al menos 6 caracteres"
     if (!formData.confirmPassword) return "Confirma tu contraseña"
     if (formData.password !== formData.confirmPassword) return "Las contraseñas no coinciden"
-    if (!formData.faculty.trim()) return "La facultad es requerida"
     
     return null
   }
@@ -92,51 +92,34 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       // Llamar al backend
       const response = await axiosClient.post("/auth/register", {
         nombre: formData.nombre,
+        apellido: formData.apellido,
         email: formData.email,
         password: formData.password,
-        faculty: formData.faculty,
         role: formData.role,
       })
 
-      const { data } = response.data
+      const { accessToken, refreshToken } = response.data || {}
 
-      // Guardar tokens y usuario en localStorage
-      localStorage.setItem("accessToken", data.accessToken)
-      localStorage.setItem("refreshToken", data.refreshToken)
-      localStorage.setItem("currentUser", JSON.stringify({
-        id: data.user._id,
-        name: data.user.nombre,
-        email: data.user.email,
-        faculty: data.user.faculty,
-        role: data.user.role,
-        isLoggedIn: true,
-      }))
+      if (!accessToken) {
+        throw new Error("Respuesta de registro sin accessToken")
+      }
 
-      setSuccess("Cuenta creada exitosamente")
+      // No hacer login automático - el usuario necesita ser activado por admin
+
+      setSuccess("Cuenta creada exitosamente. Tu cuenta necesita ser activada para que puedas realizar tus reservas. Por favor, comunícate con un administrador.")
       
       toast({
         title: "Registro exitoso",
-        description: `Bienvenido ${data.user.nombre}`,
-        className: "bg-green-50 border-green-200 text-green-800",
+        description: "Tu cuenta necesita ser activada por un administrador",
+        className: "bg-blue-50 border-blue-200 text-blue-800",
       })
 
-      // Llamar callback si existe
-      if (onRegisterSuccess) {
-        onRegisterSuccess({
-          id: data.user._id,
-          name: data.user.nombre,
-          email: data.user.email,
-          faculty: data.user.faculty,
-          role: data.user.role,
-          isLoggedIn: true,
-        })
-      }
+      // No llamar callback - el usuario no está logueado automáticamente
 
-      // Cerrar modal y recargar después de un momento
+      // Cerrar modal después de mostrar el mensaje
       setTimeout(() => {
         onClose()
-        router.refresh()
-      }, 1500)
+      }, 4000)
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || "Error al registrarse"
       setError(errorMessage)
@@ -180,16 +163,30 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="nombre">Nombre Completo *</Label>
+                <Label htmlFor="nombre">Nombre *</Label>
                 <Input 
                   id="nombre" 
                   name="nombre" 
                   value={formData.nombre} 
                   onChange={handleChange} 
                   disabled={isLoading}
-                  placeholder="Juan Pérez"
+                  placeholder="Juan"
                 />
               </div>
+              <div>
+                <Label htmlFor="apellido">Apellido *</Label>
+                <Input 
+                  id="apellido" 
+                  name="apellido" 
+                  value={formData.apellido} 
+                  onChange={handleChange} 
+                  disabled={isLoading}
+                  placeholder="Pérez"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <Label htmlFor="email">Correo electrónico *</Label>
                 <Input 
@@ -231,18 +228,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="faculty">Facultad *</Label>
-                <Input 
-                  id="faculty" 
-                  name="faculty" 
-                  value={formData.faculty} 
-                  onChange={handleChange} 
-                  disabled={isLoading}
-                  placeholder="Ej: Ingeniería"
-                />
-              </div>
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <Label htmlFor="role">Rol</Label>
                 <Select 
@@ -254,7 +240,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                     <SelectValue placeholder="Selecciona un rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Estudiante">Estudiante</SelectItem>
                     <SelectItem value="Profesor">Profesor</SelectItem>
                     <SelectItem value="Investigador">Investigador</SelectItem>
                   </SelectContent>

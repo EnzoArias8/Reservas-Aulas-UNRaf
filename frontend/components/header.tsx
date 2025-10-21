@@ -82,6 +82,8 @@ export function Header() {
     },
   ]
 
+  const isAdmin = user?.role === "Admin"
+
   // Filtrar rutas según si el usuario está autenticado
   const filteredRoutes = routes.filter((route) => !route.requiresAuth || user)
 
@@ -155,6 +157,17 @@ export function Header() {
               {route.label}
             </Link>
           ))}
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary",
+                pathname.startsWith("/admin") ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              Administrar
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-2">

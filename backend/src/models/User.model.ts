@@ -4,13 +4,11 @@ import bcrypt from 'bcryptjs';
 
 export interface IUser extends Document {
   nombre: string;
+  apellido: string;
   email: string;
   password: string;
-  faculty?: string;
-  role: 'Estudiante' | 'Profesor' | 'Investigador' | 'Admin';
+  role: 'Profesor' | 'Investigador' | 'Admin';
   telefono?: string;
-  carrera?: string;
-  semestre?: string;
   isActive: boolean;
   refreshToken?: string;
   createdAt: Date;
@@ -24,7 +22,13 @@ const userSchema = new Schema<IUser>(
       type: String,
       required: [true, 'El nombre es requerido'],
       trim: true,
-      maxlength: [100, 'El nombre no puede exceder 100 caracteres']
+      maxlength: [50, 'El nombre no puede exceder 50 caracteres']
+    },
+    apellido: {
+      type: String,
+      required: [true, 'El apellido es requerido'],
+      trim: true,
+      maxlength: [50, 'El apellido no puede exceder 50 caracteres']
     },
     email: {
       type: String,
@@ -43,30 +47,18 @@ const userSchema = new Schema<IUser>(
       minlength: [6, 'La contraseña debe tener al menos 6 caracteres'],
       select: false
     },
-    faculty: {
-      type: String,
-      trim: true
-    },
     role: {
       type: String,
-      enum: ['Estudiante', 'Profesor', 'Investigador', 'Admin'],
-      default: 'Estudiante'
+      enum: ['Profesor', 'Investigador', 'Admin'],
+      default: 'Profesor'
     },
     telefono: {
       type: String,
       trim: true
     },
-    carrera: {
-      type: String,
-      trim: true
-    },
-    semestre: {
-      type: String,
-      trim: true
-    },
     isActive: {
       type: Boolean,
-      default: true
+      default: false
     },
     refreshToken: {
       type: String,

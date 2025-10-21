@@ -70,17 +70,29 @@ export function LoginModal({ isOpen, onClose, onOpenRegister, onLoginSuccess }: 
         password: password,
       })
 
-      const { data } = response.data
+      const { accessToken, refreshToken } = response.data || {}
 
-      // Guardar tokens y usuario en localStorage
-      localStorage.setItem("accessToken", data.accessToken)
-      localStorage.setItem("refreshToken", data.refreshToken)
+      if (!accessToken) {
+        throw new Error("Respuesta de login sin accessToken")
+      }
+
+      // Guardar tokens
+      localStorage.setItem("accessToken", accessToken)
+      if (refreshToken) localStorage.setItem("refreshToken", refreshToken)
+
+      // Obtener usuario actual
+      const me = await axiosClient.get("/auth/me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const user = me.data?.data || me.data
+
+      // Guardar usuario
       localStorage.setItem("currentUser", JSON.stringify({
-        id: data.user._id,
-        name: data.user.nombre,
-        email: data.user.email,
-        faculty: data.user.faculty,
-        role: data.user.role,
+        id: user?._id || user?.id,
+        name: user?.nombre || user?.name,
+        email: user?.email,
+        faculty: user?.faculty,
+        role: user?.role,
         isLoggedIn: true,
       }))
 
@@ -88,44 +100,63 @@ export function LoginModal({ isOpen, onClose, onOpenRegister, onLoginSuccess }: 
 
       toast({
         title: "Bienvenido",
-        description: `Has iniciado sesión como ${data.user.nombre}`,
+        description: `Has iniciado sesión como ${user?.nombre || user?.name}`,
         className: "bg-green-50 border-green-200 text-green-800",
       })
 
       // Llamar callback si existe
       if (onLoginSuccess) {
         onLoginSuccess({
-          id: data.user._id,
-          name: data.user.nombre,
-          email: data.user.email,
-          faculty: data.user.faculty,
-          role: data.user.role,
+          id: user?._id || user?.id,
+          name: user?.nombre || user?.name,
+          email: user?.email,
+          faculty: user?.faculty,
+          role: user?.role,
           isLoggedIn: true,
         })
       }
 
-      // Cerrar modal y recargar después de un momento
+      // Cerrar modal después de un momento SOLO en caso de éxito
+      // Solo hacer router.refresh() si no hay callback de éxito (para no perder datos del formulario)
       setTimeout(() => {
         onClose()
-        router.refresh()
+        if (!onLoginSuccess) {
+          router.refresh()
+        }
       }, 1500)
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || "Error al iniciar sesión"
-      setError(errorMessage)
-
-      toast({
-        title: "Error al iniciar sesión",
-        description: errorMessage,
-        variant: "destructive",
-        className: "bg-red-50 border-red-200 text-red-800",
-      })
+      
+      // Si es error de cuenta inactiva, mostrar mensaje específico
+      if (errorMessage.includes("validada por un administrador")) {
+        setError("Tu cuenta necesita ser activada, por favor comunícate con un administrador.")
+        toast({
+          title: "Cuenta pendiente de activación",
+          description: "Tu cuenta necesita ser activada, por favor comunícate con un administrador.",
+          className: "bg-blue-50 border-blue-200 text-blue-800",
+        })
+      } else {
+        setError(errorMessage)
+        toast({
+          title: "Error al iniciar sesión",
+          description: errorMessage,
+          variant: "destructive",
+          className: "bg-red-50 border-red-200 text-red-800",
+        })
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      // No cerrar automáticamente si hay error de cuenta inactiva
+      if (!open && error && (error.includes("activada") || error.includes("administrador"))) {
+        return
+      }
+      onClose()
+    }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">

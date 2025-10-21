@@ -1,13 +1,12 @@
 // Tipos principales del sistema
 export interface User {
-  id: string
-  name: string
+  _id: string
+  nombre: string
+  apellido: string
   email: string
-  faculty?: string
-  role: "Estudiante" | "Profesor" | "Investigador" | "Admin"
-  phone?: string
-  career?: string
-  semester?: string
+  role: "Profesor" | "Investigador" | "Admin"
+  telefono?: string
+  isActive: boolean
   createdAt: string
   updatedAt: string
 }
@@ -31,7 +30,7 @@ export interface Reservation {
   timeSlot: string
   purpose: string
   attendees: number
-  status: "pending" | "confirmed" | "cancelled" | "completed"
+  status: "confirmed" | "completed"
   createdAt: string
   // Relaciones pobladas por el backend
   lab?: Lab
@@ -51,12 +50,12 @@ export interface LoginRequest {
 }
 
 export interface RegisterRequest {
-  name: string
+  nombre: string
+  apellido: string
   email: string
   password: string
   confirmPassword: string
-  faculty: string
-  role: "Estudiante" | "Profesor" | "Investigador"
+  role: "Profesor" | "Investigador"
 }
 
 export interface CreateReservationRequest {

@@ -1,36 +1,79 @@
-import { apiClient } from "@/lib/api"
+import { apiClient, axiosClient } from "@/lib/api"
 import type { User, LoginRequest, RegisterRequest, AuthResponse, ApiResponse } from "@/lib/types"
 
 export class AuthService {
   static async login(credentials: LoginRequest): Promise<AuthResponse> {
-    const response = await apiClient.post<ApiResponse<AuthResponse>>("/auth/login", credentials)
+    // El backend responde { success, accessToken, refreshToken }
+    const response = await apiClient.post<any>("/auth/login", credentials)
+
+    const accessToken: string = response.accessToken
+    const refreshToken: string = response.refreshToken
+
+    if (!accessToken) {
+      throw new Error("Login sin accessToken")
+    }
 
     // Guardar tokens
-    apiClient.defaults.headers.common["Authorization"] = `Bearer ${response.data.token}`
+    apiClient.setToken(accessToken)
     if (typeof window !== "undefined") {
-      localStorage.setItem("refresh_token", String(response.data.refreshToken))
+      localStorage.setItem("accessToken", accessToken)
+      if (refreshToken) localStorage.setItem("refreshToken", refreshToken)
+    }
+
+    // Obtener usuario actual
+    const user = await AuthService.getCurrentUser()
+
+    // Persistir usuario para el Header
+    if (typeof window !== "undefined") {
+      localStorage.setItem("currentUser", JSON.stringify({
+        id: (user as any)?._id || (user as any)?.id,
+        name: (user as any)?.nombre || (user as any)?.name || "Usuario",
+        email: user.email,
+        role: (user as any)?.role,
+        isLoggedIn: true,
+      }))
     }
 
     return {
-      user: response.data.data.user,
-      token: response.data.data.token,
-      refreshToken: typeof response.data.data.refreshToken === "string" ? response.data.data.refreshToken : "",
+      user,
+      token: accessToken,
+      refreshToken: refreshToken || "",
     }
   }
 
   static async register(userData: RegisterRequest): Promise<AuthResponse> {
-    const response = await apiClient.post<ApiResponse<AuthResponse>>("/auth/register", userData)
+    // El backend responde { success, accessToken, refreshToken }
+    const response = await apiClient.post<any>("/auth/register", userData)
 
-    // Guardar tokens
-    apiClient.defaults.headers.common["Authorization"] = `Bearer ${response.data.token}`
+    const accessToken: string = response.accessToken
+    const refreshToken: string = response.refreshToken
+
+    if (!accessToken) {
+      throw new Error("Registro sin accessToken")
+    }
+
+    apiClient.setToken(accessToken)
     if (typeof window !== "undefined") {
-      localStorage.setItem("refresh_token", String(response.data.refreshToken))
+      localStorage.setItem("accessToken", accessToken)
+      if (refreshToken) localStorage.setItem("refreshToken", refreshToken)
+    }
+
+    const user = await AuthService.getCurrentUser()
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("currentUser", JSON.stringify({
+        id: (user as any)?._id || (user as any)?.id,
+        name: (user as any)?.nombre || (user as any)?.name || "Usuario",
+        email: user.email,
+        role: (user as any)?.role,
+        isLoggedIn: true,
+      }))
     }
 
     return {
-      user: response.data.data.user,
-      token: response.data.data.token,
-      refreshToken: typeof response.data.data.refreshToken === "string" ? response.data.data.refreshToken : "",
+      user,
+      token: accessToken,
+      refreshToken: refreshToken || "",
     }
   }
 
@@ -38,40 +81,49 @@ export class AuthService {
     try {
       await apiClient.post("/auth/logout")
     } finally {
-      delete apiClient.defaults.headers.common["Authorization"]
+      apiClient.clearToken?.()
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("accessToken")
+        localStorage.removeItem("refreshToken")
+        localStorage.removeItem("currentUser")
+      }
     }
   }
 
   static async getCurrentUser(): Promise<User> {
-    const response = await apiClient.get<ApiResponse<User>>("/auth/me")
+    const response = await axiosClient.get<any>("/auth/me")
     return response.data.data
   }
 
   static async updateProfile(userData: Partial<User>): Promise<User> {
-    const response = await apiClient.put<ApiResponse<User>>("/auth/profile", userData)
+    const response = await axiosClient.put<ApiResponse<User>>("/auth/profile", userData)
     return response.data.data
   }
 
   static async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    await apiClient.post("/auth/change-password", {
+    await axiosClient.post("/auth/change-password", {
       currentPassword,
       newPassword,
     })
   }
 
   static async refreshToken(): Promise<string> {
-    const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null
+    const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refreshToken") : null
 
     if (!refreshToken) {
       throw new Error("No refresh token available")
     }
 
-    const response = await apiClient.post<ApiResponse<{ token: string }>>("/auth/refresh", {
-      refreshToken,
-    })
-
-    apiClient.setToken(response.data.token)
-    return response.data.token
+    const response = await apiClient.post<any>("/auth/refresh", { refreshToken })
+    const accessToken: string = response.data?.accessToken || response.accessToken
+    if (!accessToken) {
+      throw new Error("No se recibió nuevo accessToken")
+    }
+    apiClient.setToken(accessToken)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accessToken", accessToken)
+    }
+    return accessToken
   }
 }
 
@@ -81,7 +133,7 @@ export type LoginPayload = { email: string; password: string }
 
 export async function login(payload: LoginPayload) {
   try {
-    const res = await apiClient.post('/auth/login', payload)
+    const res: any = await apiClient.post('/auth/login', payload)
     return res.data
   } catch (err: any) {
     // devolver error claro para el UI

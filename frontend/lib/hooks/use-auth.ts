@@ -81,6 +81,25 @@ export const useAuth = create<AuthState>()(
       },
 
       loadUser: async () => {
+        // Solo intentar cargar usuario si hay un token en localStorage
+        if (typeof window === "undefined") return
+        
+        // Limpiar estado persistido incorrectamente
+        const token = localStorage.getItem("accessToken")
+        console.log("🔍 loadUser - token exists:", !!token)
+        
+        if (!token) {
+          console.log("🔍 loadUser - no token, setting unauthenticated")
+          // Limpiar completamente el estado
+          localStorage.removeItem("currentUser")
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+          })
+          return
+        }
+
         set({ isLoading: true })
         try {
           const user = await AuthService.getCurrentUser()
@@ -90,6 +109,10 @@ export const useAuth = create<AuthState>()(
             isLoading: false,
           })
         } catch (error) {
+          // Si falla la autenticación, limpiar tokens
+          localStorage.removeItem("accessToken")
+          localStorage.removeItem("refreshToken")
+          localStorage.removeItem("currentUser")
           set({
             user: null,
             isAuthenticated: false,
@@ -101,8 +124,9 @@ export const useAuth = create<AuthState>()(
     {
       name: "auth-storage",
       partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
+        // NO persistir el estado de autenticación - siempre verificar desde localStorage
+        user: null,
+        isAuthenticated: false,
       }),
     },
   ),

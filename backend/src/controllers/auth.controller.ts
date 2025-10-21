@@ -18,7 +18,7 @@ export const register = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { nombre, email, password, faculty, role } = req.body;
+    const { nombre, apellido, email, password, role } = req.body;
 
     // Verificar si el usuario ya existe
     const existingUser = await User.findOne({ email });
@@ -29,10 +29,10 @@ export const register = async (
     // Crear usuario
     const user = await User.create({
       nombre,
+      apellido,
       email,
       password,
-      faculty,
-      role: role || 'Estudiante'
+      role: role || 'Profesor'
     });
 
     // Generar tokens y enviar respuesta
@@ -65,7 +65,7 @@ export const login = async (
     }
 
     if (!user.isActive) {
-      throw new AppError('Tu cuenta ha sido desactivada', 401);
+      throw new AppError('Tu cuenta necesita ser validada por un administrador', 401);
     }
 
     // Generar refresh token y guardarlo
@@ -140,7 +140,7 @@ export const updateProfile = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const allowedFields = ['nombre', 'faculty', 'telefono', 'carrera', 'semestre'];
+    const allowedFields = ['nombre', 'apellido', 'telefono'];
     const updates: any = {};
 
     Object.keys(req.body).forEach(key => {
@@ -237,7 +237,7 @@ export const refreshToken = async (
     }
 
     if (!user.isActive) {
-      throw new AppError('Tu cuenta ha sido desactivada', 401);
+      throw new AppError('Tu cuenta necesita ser validada por un administrador', 401);
     }
 
     // Generar nuevo access token

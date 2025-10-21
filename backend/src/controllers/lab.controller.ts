@@ -158,16 +158,22 @@ export const getAvailableTimeSlots = async (
       throw new AppError('Laboratorio no encontrado', 404);
     }
 
-    // Todos los horarios posibles
-    const allTimeSlots = [
-      '08:00 - 10:00',
-      '10:00 - 12:00',
-      '12:00 - 14:00',
-      '14:00 - 16:00',
-      '16:00 - 18:00',
-      '18:00 - 20:00',
-      '20:00 - 22:00'
-    ];
+    // Generar horarios de 15 minutos desde las 08:00 hasta las 23:00
+    const allTimeSlots = [];
+    for (let hour = 8; hour <= 23; hour++) {
+      for (let minute = 0; minute < 60; minute += 15) {
+        if (hour === 23 && minute > 0) break; // No pasar de las 23:00
+        const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const endMinute = minute + 15;
+        const endHour = endMinute >= 60 ? hour + 1 : hour;
+        const endMinuteAdjusted = endMinute >= 60 ? endMinute - 60 : endMinute;
+        
+        if (endHour <= 23) {
+          const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteAdjusted.toString().padStart(2, '0')}`;
+          allTimeSlots.push(`${startTime} - ${endTime}`);
+        }
+      }
+    }
 
     // Buscar reservas para ese laboratorio y fecha
     const reservations = await Reservation.find({
@@ -176,13 +182,34 @@ export const getAvailableTimeSlots = async (
       status: { $in: ['pending', 'confirmed'] }
     });
 
-    // Obtener horarios reservados
-    const reservedSlots = reservations.map(r => r.timeSlot);
+    // Función para verificar si un slot se superpone con reservas existentes
+    const isSlotAvailable = (slot: string) => {
+      const [startTime, endTime] = slot.split(' - ');
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+      
+      const startMinutes = startHour * 60 + startMinute;
+      const endMinutes = endHour * 60 + endMinute;
+
+      // Verificar si este slot se superpone con alguna reserva existente
+      for (const reservation of reservations) {
+        const [existingStart, existingEnd] = reservation.timeSlot.split(' - ');
+        const [existingStartHour, existingStartMinute] = existingStart.split(':').map(Number);
+        const [existingEndHour, existingEndMinute] = existingEnd.split(':').map(Number);
+        
+        const existingStartMinutes = existingStartHour * 60 + existingStartMinute;
+        const existingEndMinutes = existingEndHour * 60 + existingEndMinute;
+
+        // Verificar superposición: si hay intersección, el slot no está disponible
+        if (!(endMinutes <= existingStartMinutes || startMinutes >= existingEndMinutes)) {
+          return false;
+        }
+      }
+      return true;
+    };
 
     // Filtrar horarios disponibles
-    const availableSlots = allTimeSlots.filter(
-      slot => !reservedSlots.includes(slot)
-    );
+    const availableSlots = allTimeSlots.filter(isSlotAvailable);
 
     res.status(200).json({
       success: true,

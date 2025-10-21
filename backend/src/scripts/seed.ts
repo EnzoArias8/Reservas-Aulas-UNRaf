@@ -21,36 +21,39 @@ const connectDB = async () => {
 const seedUsers = async () => {
   const users = [
     {
-      nombre: 'Admin Usuario',
+      nombre: 'Admin',
+      apellido: 'Usuario',
       email: 'admin@unraf.edu.ar',
       password: 'admin123',
-      faculty: 'Administración',
-      role: 'Admin'
+      role: 'Admin',
+      isActive: true
     },
     {
-      nombre: 'Juan Pérez',
+      nombre: 'Juan',
+      apellido: 'Pérez',
       email: 'juan@unraf.edu.ar',
-      password: 'estudiante123',
-      faculty: 'Ingeniería',
-      role: 'Estudiante',
-      carrera: 'Ingeniería en Sistemas',
-      semestre: '5to'
+      password: 'profesor123',
+      role: 'Profesor',
+      telefono: '1234567890',
+      isActive: true
     },
     {
-      nombre: 'María González',
+      nombre: 'María',
+      apellido: 'González',
       email: 'maria@unraf.edu.ar',
       password: 'profesor123',
-      faculty: 'Ciencias',
-      role: 'Profesor'
+      role: 'Profesor',
+      telefono: '0987654321',
+      isActive: true
     },
     {
-      nombre: 'Carlos Rodríguez',
+      nombre: 'Carlos',
+      apellido: 'Rodríguez',
       email: 'carlos@unraf.edu.ar',
-      password: 'estudiante123',
-      faculty: 'Ciencias de la Vida',
-      role: 'Estudiante',
-      carrera: 'Biología',
-      semestre: '3ro'
+      password: 'profesor123',
+      role: 'Investigador',
+      telefono: '1122334455',
+      isActive: true
     }
   ];
 
@@ -215,11 +218,14 @@ const seed = async () => {
     console.log('Admin:');
     console.log('  Email: admin@unraf.edu.ar');
     console.log('  Pass:  admin123');
-    console.log('\nEstudiante:');
+    console.log('\nProfesor:');
     console.log('  Email: juan@unraf.edu.ar');
-    console.log('  Pass:  estudiante123');
+    console.log('  Pass:  profesor123');
     console.log('\nProfesor:');
     console.log('  Email: maria@unraf.edu.ar');
+    console.log('  Pass:  profesor123');
+    console.log('\nInvestigador:');
+    console.log('  Email: carlos@unraf.edu.ar');
     console.log('  Pass:  profesor123');
     console.log('═══════════════════════════════════════\n');
 

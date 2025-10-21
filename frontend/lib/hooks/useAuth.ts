@@ -18,9 +18,14 @@ export function useAuth() {
         setIsLoading(false)
         return
       }
-      const raw = localStorage.getItem("user")
+      const raw = localStorage.getItem("currentUser")
       if (raw) {
-        setUser(JSON.parse(raw))
+        const userData = JSON.parse(raw)
+        setUser({
+          _id: userData.id,
+          name: userData.name,
+          email: userData.email
+        })
       } else {
         setUser(null)
       }
