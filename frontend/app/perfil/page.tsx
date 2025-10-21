@@ -363,8 +363,8 @@ export default function PerfilPage() {
 
           <div className="md:col-span-2">
             <div className="backdrop-blur-sm bg-white/70 dark:bg-slate-800/70 rounded-2xl border border-white/20 shadow-xl">
-              <Tabs defaultValue="informacion">
-                <TabsList className="grid w-full grid-cols-2 m-6 mb-0 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-slate-700 dark:to-slate-600">
+              <Tabs defaultValue="informacion" className="w-full flex flex-col items-center">
+                <TabsList className="grid grid-cols-2 mx-auto mt-6 mb-0 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-slate-700 dark:to-slate-600 w-full max-w-md">
                   <TabsTrigger
                     value="informacion"
                     className="data-[state=active]:bg-white data-[state=active]:text-blue-600 font-medium"
@@ -381,8 +381,9 @@ export default function PerfilPage() {
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="informacion" className="p-6">
-                  <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+                <TabsContent value="informacion" className="w-full px-6">
+                  <div className="max-w-4xl mx-auto">
+                    <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <User className="h-5 w-5 text-blue-600" />
@@ -478,10 +479,12 @@ export default function PerfilPage() {
                       )}
                     </CardFooter>
                   </Card>
+                  </div>
                 </TabsContent>
 
-                <TabsContent value="seguridad" className="p-6">
-                  <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+                <TabsContent value="seguridad" className="w-full px-6">
+                  <div className="max-w-4xl mx-auto">
+                    <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Lock className="h-5 w-5 text-purple-600" />
@@ -546,6 +549,7 @@ export default function PerfilPage() {
                       </Button>
                     </CardFooter>
                   </Card>
+                  </div>
                 </TabsContent>
               </Tabs>
             </div>

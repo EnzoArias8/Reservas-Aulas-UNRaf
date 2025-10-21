@@ -376,6 +376,9 @@ function ReservationsAdmin() {
             <option value="confirmed">Confirmada</option>
             <option value="completed">Completada</option>
           </select>
+          <Button onClick={() => { setEditing(null); setForm({ date: "", timeSlot: "", purpose: "", attendees: "", status: "confirmed" }); setIsOpen(true) }}>
+            Crear Reserva
+          </Button>
           <Button onClick={fetchReservations} variant="outline">Refrescar</Button>
         </div>
         {loading ? (
@@ -634,7 +637,7 @@ function UsersAdmin() {
   const [users, setUsers] = useState<any[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
-  const [form, setForm] = useState({ nombre: "", apellido: "", email: "", telefono: "", role: "Profesor" })
+  const [form, setForm] = useState({ nombre: "", apellido: "", email: "", telefono: "", role: "Profesor", password: "" })
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -706,6 +709,9 @@ function UsersAdmin() {
             value={q} 
             onChange={(e) => setQ(e.target.value)} 
           />
+          <Button onClick={() => { setEditing(null); setForm({ nombre: "", apellido: "", email: "", telefono: "", role: "Profesor", password: "" }); setIsOpen(true) }}>
+            Crear Usuario
+          </Button>
           <Button onClick={fetchUsers} variant="outline">Refrescar</Button>
         </div>
         {loading ? (
@@ -757,7 +763,7 @@ function UsersAdmin() {
                         size="sm" 
                         onClick={() => { 
                           setEditing(u); 
-                          setForm({ nombre: u.nombre || "", apellido: u.apellido || "", email: u.email || "", telefono: u.telefono || "", role: u.role || "Profesor" }); 
+                          setForm({ nombre: u.nombre || "", apellido: u.apellido || "", email: u.email || "", telefono: u.telefono || "", role: u.role || "Profesor", password: "" }); 
                           setIsOpen(true) 
                         }}
                       >
@@ -780,7 +786,7 @@ function UsersAdmin() {
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Editar Usuario</DialogTitle>
+              <DialogTitle>{editing ? "Editar Usuario" : "Crear Usuario"}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-3">
               <div className="grid grid-cols-2 gap-3">
@@ -795,8 +801,19 @@ function UsersAdmin() {
               </div>
               <div>
                 <Label>Email</Label>
-                <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled />
+                <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={!!editing} />
               </div>
+              {!editing && (
+                <div>
+                  <Label>Contraseña</Label>
+                  <Input 
+                    type="password" 
+                    value={form.password} 
+                    onChange={(e) => setForm({ ...form, password: e.target.value })} 
+                    placeholder="Contraseña para el usuario"
+                  />
+                </div>
+              )}
               <div>
                 <Label>Teléfono</Label>
                 <Input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="Número de teléfono" />
@@ -817,15 +834,35 @@ function UsersAdmin() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
               <Button onClick={async () => {
-                if (!editing) {
-                  toast({ title: "Error", description: "No hay usuario seleccionado", variant: "destructive" })
+                if (!form.nombre || !form.apellido || !form.email) {
+                  toast({ title: "Error", description: "Por favor complete todos los campos requeridos", variant: "destructive" })
+                  return
+                }
+                if (!editing && !form.password) {
+                  toast({ title: "Error", description: "Por favor ingrese una contraseña para el usuario", variant: "destructive" })
                   return
                 }
                 try {
-                  await updateUser(editing._id, { nombre: form.nombre, apellido: form.apellido, telefono: form.telefono, role: form.role })
+                  if (editing) {
+                    // Editar usuario existente
+                    await updateUser(editing._id, { nombre: form.nombre, apellido: form.apellido, telefono: form.telefono, role: form.role })
+                  } else {
+                    // Crear nuevo usuario
+                    await axiosClient.post('/users', { 
+                      nombre: form.nombre, 
+                      apellido: form.apellido, 
+                      email: form.email, 
+                      telefono: form.telefono, 
+                      role: form.role,
+                      password: form.password
+                    })
+                    toast({ title: "Usuario creado exitosamente" })
+                  }
+                  await fetchUsers()
                   setIsOpen(false)
+                  setEditing(null)
                 } catch (e: any) {
-                  toast({ title: "Error", description: e?.message || "Error", variant: "destructive" })
+                  toast({ title: "Error", description: e?.response?.data?.message || e?.message || "Error", variant: "destructive" })
                 }
               }}>Guardar</Button>
             </DialogFooter>

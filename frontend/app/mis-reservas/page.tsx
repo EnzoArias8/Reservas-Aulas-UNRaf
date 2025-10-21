@@ -134,36 +134,37 @@ export default function MisReservasPage() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="proximas">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="proximas" className="flex items-center gap-2">
+        <Tabs defaultValue="proximas" className="w-full flex flex-col items-center">
+          <TabsList className="grid grid-cols-2 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-slate-700 dark:to-slate-600 w-full max-w-md">
+            <TabsTrigger value="proximas" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-blue-600 font-medium">
               <Clock className="h-4 w-4" />
               Próximas Reservas ({upcomingReservations.length})
             </TabsTrigger>
-            <TabsTrigger value="pasadas" className="flex items-center gap-2">
+            <TabsTrigger value="pasadas" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-purple-600 font-medium">
               <Calendar className="h-4 w-4" />
               Reservas Pasadas ({pastReservations.length})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="proximas">
-            {upcomingReservations.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-10">
-                  <div className="rounded-full bg-yellow-100 p-3 mb-4">
-                    <AlertCircle className="h-6 w-6 text-yellow-600" />
-                  </div>
-                  <h3 className="text-xl font-medium mb-2">No tienes reservas próximas</h3>
-                  <p className="text-muted-foreground text-center mb-6">
-                    No tienes reservas programadas para fechas futuras.
-                  </p>
-                  <Button asChild>
-                    <Link href="/">Hacer una Reserva</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <TabsContent value="proximas" className="w-full px-6">
+            <div className="max-w-7xl mx-auto">
+              {upcomingReservations.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-10">
+                    <div className="rounded-full bg-yellow-100 p-3 mb-4">
+                      <AlertCircle className="h-6 w-6 text-yellow-600" />
+                    </div>
+                    <h3 className="text-xl font-medium mb-2">No tienes reservas próximas</h3>
+                    <p className="text-muted-foreground text-center mb-6">
+                      No tienes reservas programadas para fechas futuras.
+                    </p>
+                    <Button asChild>
+                      <Link href="/">Hacer una Reserva</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {upcomingReservations.map((reservation: Reservation) => (
                   <Card key={reservation._id} className="overflow-hidden border border-blue-200 dark:border-blue-800">
                     <CardHeader className="bg-slate-50 dark:bg-slate-800 pb-4">
@@ -171,12 +172,12 @@ export default function MisReservasPage() {
                         <div>
                           <CardTitle className="flex items-center gap-2">
                             <FlaskConical className="h-5 w-5 text-primary" />
-                            {reservation.labId?.name || reservation.lab?.name || 'Laboratorio no especificado'}
+                            {reservation.lab?.name || 'Laboratorio no especificado'}
                           </CardTitle>
                           <CardDescription className="mt-1">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-3.5 w-3.5" />
-                              {reservation.labId?.building || reservation.lab?.building || 'N/A'}, {reservation.labId?.floor || reservation.lab?.floor || 'N/A'}
+                              {reservation.lab?.building || 'N/A'}, {reservation.lab?.floor || 'N/A'}
                             </div>
                           </CardDescription>
                         </div>
@@ -227,11 +228,11 @@ export default function MisReservasPage() {
                           <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
                             <div className="flex justify-between">
                               <span className="font-medium">Aula/Laboratorio:</span>
-                              <span>{reservation.labId?.name || reservation.lab?.name || 'N/A'}</span>
+                              <span>{reservation.lab?.name || 'N/A'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="font-medium">Edificio:</span>
-                              <span>{reservation.labId?.building || reservation.lab?.building || 'N/A'}</span>
+                              <span>{reservation.lab?.building || 'N/A'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="font-medium">Fecha:</span>
@@ -277,28 +278,30 @@ export default function MisReservasPage() {
                     </CardFooter>
                   </Card>
                 ))}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
-          <TabsContent value="pasadas">
-            {pastReservations.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-10">
-                  <div className="rounded-full bg-yellow-100 p-3 mb-4">
-                    <AlertCircle className="h-6 w-6 text-yellow-600" />
-                  </div>
-                  <h3 className="text-xl font-medium mb-2">No tienes reservas pasadas</h3>
-                  <p className="text-muted-foreground text-center mb-6">
-                    No has realizado reservas en fechas anteriores.
-                  </p>
-                  <Button asChild>
-                    <Link href="/">Hacer una Reserva</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <TabsContent value="pasadas" className="w-full px-6">
+            <div className="max-w-7xl mx-auto">
+              {pastReservations.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-10">
+                    <div className="rounded-full bg-yellow-100 p-3 mb-4">
+                      <AlertCircle className="h-6 w-6 text-yellow-600" />
+                    </div>
+                    <h3 className="text-xl font-medium mb-2">No tienes reservas pasadas</h3>
+                    <p className="text-muted-foreground text-center mb-6">
+                      No has realizado reservas en fechas anteriores.
+                    </p>
+                    <Button asChild>
+                      <Link href="/">Hacer una Reserva</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {pastReservations.map((reservation: Reservation) => (
                   <Card key={reservation._id} className="overflow-hidden opacity-80">
                     <CardHeader className="bg-slate-50 dark:bg-slate-800 pb-4">
@@ -306,12 +309,12 @@ export default function MisReservasPage() {
                         <div>
                           <CardTitle className="flex items-center gap-2">
                             <FlaskConical className="h-5 w-5 text-muted-foreground" />
-                            {reservation.labId?.name || reservation.lab?.name || 'Laboratorio no especificado'}
+                            {reservation.lab?.name || 'Laboratorio no especificado'}
                           </CardTitle>
                           <CardDescription className="mt-1">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-3.5 w-3.5" />
-                              {reservation.labId?.building || reservation.lab?.building || 'N/A'}, {reservation.labId?.floor || reservation.lab?.floor || 'N/A'}
+                              {reservation.lab?.building || 'N/A'}, {reservation.lab?.floor || 'N/A'}
                             </div>
                           </CardDescription>
                         </div>
@@ -347,8 +350,9 @@ export default function MisReservasPage() {
                     </CardContent>
                   </Card>
                 ))}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       )}

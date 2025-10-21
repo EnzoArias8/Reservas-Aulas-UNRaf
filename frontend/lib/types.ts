@@ -18,7 +18,6 @@ export interface Lab {
   floor: string
   capacity: number
   equipment: string[]
-  description?: string
   isActive: boolean
   createdAt: string
   updatedAt: string

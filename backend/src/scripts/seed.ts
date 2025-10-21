@@ -74,7 +74,6 @@ const seedLabs = async () => {
         'Material de vidrio',
         'Campanas extractoras'
       ],
-      description: 'Laboratorio equipado para prácticas de química general y orgánica',
       isActive: true
     },
     {
@@ -89,7 +88,6 @@ const seedLabs = async () => {
         'Fuentes de alimentación',
         'Kits de óptica'
       ],
-      description: 'Laboratorio para experimentos de física aplicada y electrónica',
       isActive: true
     },
     {
@@ -104,7 +102,6 @@ const seedLabs = async () => {
         'Autoclaves',
         'Cabinas de bioseguridad'
       ],
-      description: 'Laboratorio especializado en biología molecular y microbiología',
       isActive: true
     },
     {
@@ -119,7 +116,6 @@ const seedLabs = async () => {
         'Equipos de red',
         'Proyectores'
       ],
-      description: 'Laboratorio de computación con equipos de última generación',
       isActive: true
     },
     {
@@ -134,7 +130,6 @@ const seedLabs = async () => {
         'Analizadores lógicos',
         'Impresora 3D'
       ],
-      description: 'Laboratorio para desarrollo y prototipado electrónico',
       isActive: true
     }
   ];

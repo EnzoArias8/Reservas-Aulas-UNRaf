@@ -49,6 +49,27 @@ export function Header() {
     }
   }, [])
 
+  // Función para obtener iniciales del usuario (como Google)
+  const getUserInitials = () => {
+    if (!user) return "U"
+    
+    // Si tiene nombre y apellido separados
+    if (user.nombre && user.apellido) {
+      return `${user.nombre.charAt(0)}${user.apellido.charAt(0)}`.toUpperCase()
+    }
+    
+    // Si tiene name completo, tomar primera letra de cada palabra
+    if (user.name) {
+      const names = user.name.trim().split(' ')
+      if (names.length >= 2) {
+        return `${names[0].charAt(0)}${names[names.length - 1].charAt(0)}`.toUpperCase()
+      }
+      return user.name.charAt(0).toUpperCase()
+    }
+    
+    return "U"
+  }
+
   const handleLogout = () => {
     localStorage.removeItem("currentUser")
     setUser(null)
@@ -88,7 +109,7 @@ export function Header() {
   const filteredRoutes = routes.filter((route) => !route.requiresAuth || user)
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-white dark:bg-slate-900">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-2 md:gap-4">
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -177,13 +198,15 @@ export function Header() {
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src="/placeholder.svg?height=40&width=40" alt={user.name} />
-                    <AvatarFallback>{user?.name?.charAt(0) ?? "U"}</AvatarFallback>
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">{getUserInitials()}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <div className="flex flex-col space-y-1 p-2">
-                  <p className="text-sm font-medium leading-none">{user.name}</p>
+                  <p className="text-sm font-medium leading-none">
+                    {user.nombre && user.apellido ? `${user.nombre} ${user.apellido}` : user.name}
+                  </p>
                   <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                   <p className="text-xs leading-none text-muted-foreground">{user.role || "Usuario"}</p>
                 </div>

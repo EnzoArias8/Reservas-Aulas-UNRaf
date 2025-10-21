@@ -89,7 +89,7 @@ export const getReservationById = async (req: AuthRequest, res: Response, next: 
     console.log("🔍 Backend: Getting reservation by ID:", id, "for user:", userId);
 
     const reservation = await Reservation.findById(id)
-      .populate('labId', 'name building floor capacity equipment description')
+      .populate('labId', 'name building floor capacity equipment')
       .populate('userId', 'email');
 
     if (!reservation) {
@@ -181,7 +181,7 @@ export const updateReservation = async (req: AuthRequest, res: Response, next: N
     await reservation.save();
 
     // Poblar los datos relacionados
-    await reservation.populate('labId', 'name building floor capacity equipment description');
+    await reservation.populate('labId', 'name building floor capacity equipment');
     await reservation.populate('userId', 'email');
 
     res.status(200).json({

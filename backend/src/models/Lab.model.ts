@@ -7,7 +7,6 @@ export interface ILab extends Document {
   floor: string;
   capacity: number;
   equipment: string[];
-  description?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -38,10 +37,6 @@ const labSchema = new Schema<ILab>(
     equipment: {
       type: [String],
       default: []
-    },
-    description: {
-      type: String,
-      trim: true
     },
     isActive: {
       type: Boolean,

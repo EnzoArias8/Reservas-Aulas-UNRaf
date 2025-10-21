@@ -2,6 +2,44 @@ import { Request, Response, NextFunction } from 'express';
 import { User } from '../models/User.model';
 import { AppError } from '../utils/AppError';
 
+export const createUser = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { nombre, apellido, email, password, telefono, role } = req.body;
+
+    // Verificar si el usuario ya existe
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      throw new AppError('El email ya está registrado', 400);
+    }
+
+    // Crear usuario
+    const user = await User.create({
+      nombre,
+      apellido,
+      email,
+      password,
+      telefono,
+      role: role || 'Profesor',
+      isActive: true
+    });
+
+    res.status(201).json({ 
+      success: true, 
+      data: {
+        _id: user._id,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        email: user.email,
+        role: user.role,
+        telefono: user.telefono,
+        isActive: user.isActive
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { q, role, isActive } = req.query as { q?: string; role?: string; isActive?: string };
