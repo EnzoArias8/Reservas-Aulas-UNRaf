@@ -19,6 +19,7 @@ import { LoginModal } from "@/components/auth/login-modal"
 import { RegisterModal } from "@/components/auth/register-modal"
 import { useRouter } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface UserData {
   id: string
@@ -33,51 +34,80 @@ export function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
-  const [user, setUser] = useState<UserData | null>(null)
   const router = useRouter()
-
-  // Cargar usuario del localStorage al iniciar
-  useEffect(() => {
-    const storedUser = localStorage.getItem("currentUser")
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser)
-        setUser(userData)
-      } catch (error) {
-        console.error("Error parsing user data:", error)
-      }
-    }
-  }, [])
+  
+  // Usar el hook de autenticación
+  const { user, isLoading } = useAuth()
+  const isAuthenticated = !!user
 
   // Función para obtener iniciales del usuario (como Google)
   const getUserInitials = () => {
-    if (!user) return "U"
+    if (!user) {
+      console.log("🔍 No user found")
+      return "U"
+    }
+    
+    console.log("🔍 User data:", user)
     
     // Si tiene nombre y apellido separados
     if (user.nombre && user.apellido) {
-      return `${user.nombre.charAt(0)}${user.apellido.charAt(0)}`.toUpperCase()
+      const initials = `${user.nombre.charAt(0)}${user.apellido.charAt(0)}`.toUpperCase()
+      console.log("🔍 Initials from nombre/apellido:", initials)
+      return initials
     }
     
     // Si tiene name completo, tomar primera letra de cada palabra
     if (user.name) {
       const names = user.name.trim().split(' ')
       if (names.length >= 2) {
-        return `${names[0].charAt(0)}${names[names.length - 1].charAt(0)}`.toUpperCase()
+        const initials = `${names[0].charAt(0)}${names[names.length - 1].charAt(0)}`.toUpperCase()
+        console.log("🔍 Initials from name:", initials)
+        return initials
       }
-      return user.name.charAt(0).toUpperCase()
+      const initial = user.name.charAt(0).toUpperCase()
+      console.log("🔍 Single initial from name:", initial)
+      return initial
     }
     
+    console.log("🔍 No name found, returning U")
     return "U"
   }
 
+  // Función para obtener color de fondo basado en las iniciales (como Google)
+  const getAvatarColor = () => {
+    if (!user) {
+      console.log("🔍 No user for color, using default")
+      return "bg-gradient-to-br from-[#FFBF00] to-[#FFBF00]"
+    }
+    
+    const initials = getUserInitials()
+    const hash = initials.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    
+    // Usar los 3 colores de las aulas: naranja, teal, azul (igual que el perfil)
+    const colors = [
+      "bg-gradient-to-br from-[#FFBF00] to-[#FFBF00]", // Naranja-amarillo (color UNRaf)
+      "bg-gradient-to-br from-[#00AAAA] to-[#00AAAA]", // Teal/cyan
+      "bg-gradient-to-br from-[#336699] to-[#336699]"  // Azul medio
+    ]
+    
+    const selectedColor = colors[hash % colors.length]
+    console.log("🔍 Avatar color:", selectedColor, "for initials:", initials)
+    return selectedColor
+  }
+
   const handleLogout = () => {
+    // Limpiar localStorage
     localStorage.removeItem("currentUser")
-    setUser(null)
+    localStorage.removeItem("accessToken")
+    localStorage.removeItem("refreshToken")
+    
     toast({
       title: "Sesión cerrada",
       description: "Has cerrado sesión correctamente",
     })
     router.push("/")
+    // Recargar la página para limpiar el estado
+    window.location.reload()
   }
 
   const routes = [
@@ -160,7 +190,7 @@ export function Header() {
               className="h-8 w-auto" // Ajustá el tamaño según necesites
             />
             <span className="font-bold text-xl hidden md:inline-block"></span>
-            <span className="font-bold text-xl md:hidden">SisLab</span>
+            <span className="font-bold text-xl md:hidden"></span>
           </Link>
         </div>
 
@@ -197,8 +227,8 @@ export function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg?height=40&width=40" alt={user.name} />
-                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">{getUserInitials()}</AvatarFallback>
+                    <AvatarImage src="" alt={user.name} />
+                    <AvatarFallback className={`${getAvatarColor()} text-white font-semibold`}>{getUserInitials()}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
@@ -254,9 +284,12 @@ export function Header() {
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onOpenRegister={() => setIsRegisterModalOpen(true)}
-        onLoginSuccess={(userData) => {
-          setUser(userData);
+        onLoginSuccess={() => {
           setIsLoginModalOpen(false);
+          // Recargar la página para actualizar el estado de autenticación
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
         }}
       />
 
@@ -264,10 +297,13 @@ export function Header() {
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
         onOpenLogin={() => setIsLoginModalOpen(true)}
-        onRegisterSuccess={(userData) => {
-        setUser(userData)
-        setIsRegisterModalOpen(false)
-      }}
+        onRegisterSuccess={() => {
+          setIsRegisterModalOpen(false);
+          // Recargar la página para actualizar el estado de autenticación
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }}
       />
     </header>
   )

@@ -87,14 +87,21 @@ export function LoginModal({ isOpen, onClose, onOpenRegister, onLoginSuccess }: 
       const user = me.data?.data || me.data
 
       // Guardar usuario
-      localStorage.setItem("currentUser", JSON.stringify({
+      const userData = {
         id: user?._id || user?.id,
         name: user?.nombre || user?.name,
         email: user?.email,
         faculty: user?.faculty,
         role: user?.role,
         isLoggedIn: true,
-      }))
+      }
+      
+      console.log("🔍 Saving user data to localStorage:", userData)
+      localStorage.setItem("currentUser", JSON.stringify(userData))
+      
+      // Verificar que se guardó correctamente
+      const savedUser = localStorage.getItem("currentUser")
+      console.log("🔍 Saved user data:", savedUser)
 
       setSuccess("Inicio de sesión exitoso. Redirigiendo...")
 

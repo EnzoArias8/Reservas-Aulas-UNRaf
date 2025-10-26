@@ -65,6 +65,61 @@ export default function PerfilPage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const router = useRouter()
 
+  // Función para obtener iniciales del usuario (como Google)
+  const getUserInitials = () => {
+    if (!userData) {
+      console.log("🔍 No userData found in profile")
+      return "U"
+    }
+    
+    console.log("🔍 UserData in profile:", userData)
+    
+    // Si tiene nombre y apellido separados
+    if (userData.nombre && userData.apellido) {
+      const initials = `${userData.nombre.charAt(0)}${userData.apellido.charAt(0)}`.toUpperCase()
+      console.log("🔍 Profile initials from nombre/apellido:", initials)
+      return initials
+    }
+    
+    // Si tiene name completo, tomar primera letra de cada palabra
+    if (userData.name) {
+      const names = userData.name.trim().split(' ')
+      if (names.length >= 2) {
+        const initials = `${names[0].charAt(0)}${names[names.length - 1].charAt(0)}`.toUpperCase()
+        console.log("🔍 Profile initials from name:", initials)
+        return initials
+      }
+      const initial = userData.name.charAt(0).toUpperCase()
+      console.log("🔍 Single initial from name:", initial)
+      return initial
+    }
+    
+    console.log("🔍 No name found in profile, returning U")
+    return "U"
+  }
+
+  // Función para obtener color de fondo basado en las iniciales (colores de las aulas)
+  const getAvatarColor = () => {
+    if (!userData) {
+      console.log("🔍 No userData for color, using default")
+      return "bg-gradient-to-br from-[#FFBF00] to-[#FFBF00]"
+    }
+    
+    const initials = getUserInitials()
+    const hash = initials.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    
+    // Usar los 3 colores de las aulas: naranja, teal, azul
+    const colors = [
+      "bg-gradient-to-br from-[#FFBF00] to-[#FFBF00]", // Naranja-amarillo
+      "bg-gradient-to-br from-[#00AAAA] to-[#00AAAA]", // Teal/cyan
+      "bg-gradient-to-br from-[#336699] to-[#336699]"  // Azul medio
+    ]
+    
+    const selectedColor = colors[hash % colors.length]
+    console.log("🔍 Profile avatar color:", selectedColor, "for initials:", initials)
+    return selectedColor
+  }
+
   // Cargar datos del usuario
   useEffect(() => {
     const loadUserData = async () => {
@@ -272,9 +327,9 @@ export default function PerfilPage() {
               <CardHeader className="pb-4">
                 <div className="flex flex-col items-center">
                   <Avatar className="h-24 w-24 mb-4 ring-4 ring-blue-100 dark:ring-blue-900">
-                    <AvatarImage src="/placeholder.svg?height=96&width=96" alt={`${userData.nombre} ${userData.apellido}`} />
-                    <AvatarFallback className="text-2xl bg-gradient-to-br from-blue-500 to-purple-500 text-white">
-                      {userData?.nombre?.charAt(0) ?? "U"}
+                    <AvatarImage src="" alt={`${userData.nombre} ${userData.apellido}`} />
+                    <AvatarFallback className={`text-2xl text-white font-semibold ${getAvatarColor()}`}>
+                      {getUserInitials()}
                     </AvatarFallback>
                   </Avatar>
                   <CardTitle className="text-center text-xl">{userData.nombre} {userData.apellido}</CardTitle>

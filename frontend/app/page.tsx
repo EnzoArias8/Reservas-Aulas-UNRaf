@@ -16,6 +16,7 @@ import { TimeRangePicker } from "@/components/time-range-picker"
 import { LabCard } from "@/components/lab-card"
 import { ReservationConfirmation } from "@/components/reservation-confirmation"
 import { format } from "date-fns"
+import { es } from "date-fns/locale"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Search, FileText, Loader2 } from "lucide-react"
 import { LoginModal } from "@/components/auth/login-modal"
@@ -68,34 +69,26 @@ export default function LabReservationPage() {
   const [equipmentFilter, setEquipmentFilter] = useState("")
 
   // ✅ HOOKS REALES - Reemplaza localStorage y simulaciones
-  const { user, isAuthenticated, loadUser } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
+  const isAuthenticated = !!user
   const createReservationMutation = useCreateReservation()
   const { data: editReservation, isLoading: isLoadingEditReservation } = useReservationById(editReservationId)
 
-  // ✅ Cargar usuario al inicializar solo una vez
-  const hasLoadedUser = useRef(false)
-  useEffect(() => {
-    if (!hasLoadedUser.current) {
-      hasLoadedUser.current = true
-      loadUser()
-    }
-  }, [])
+  // ✅ El hook useAuth ya carga el usuario automáticamente
 
   // ✅ Verificar autenticación en cada render para debug
   useEffect(() => {
     console.log("🔍 Auth state changed - isAuthenticated:", isAuthenticated, "user:", user)
     const token = localStorage.getItem("accessToken")
-    console.log("🔍 Token in localStorage:", !!token)
+    const userData = localStorage.getItem("currentUser")
+    console.log("🔍 Token in localStorage:", !!token, "User in localStorage:", !!userData)
     
-    // Si no hay token pero el estado dice que está autenticado, limpiar el estado
-    if (!token && isAuthenticated) {
-      console.log("🧹 Cleaning auth state - no token but authenticated")
-      // Limpiar completamente el localStorage
+    // Solo limpiar si hay una inconsistencia real (token pero no user, o viceversa)
+    if ((token && !userData) || (!token && userData)) {
+      console.log("🧹 Cleaning inconsistent auth state")
       localStorage.removeItem("accessToken")
       localStorage.removeItem("refreshToken") 
       localStorage.removeItem("currentUser")
-      // Forzar recarga para limpiar el estado persistido
-      window.location.reload()
     }
   }, [isAuthenticated, user])
 
@@ -183,14 +176,17 @@ export default function LabReservationPage() {
     console.log("🔐 Auth state - isAuthenticated:", isAuthenticated, "user:", user)
     console.log("🔐 localStorage accessToken:", localStorage.getItem("accessToken"))
     
-    // Verificar autenticación - triple verificación estricta
+    // Verificar autenticación - verificación más robusta
     const hasToken = localStorage.getItem("accessToken")
     const hasUser = localStorage.getItem("currentUser")
     
-    if (!isAuthenticated || !user || !hasToken || !hasUser) {
+    // Verificar si realmente está autenticado
+    const isReallyAuthenticated = isAuthenticated && user && hasToken && hasUser
+    
+    if (!isReallyAuthenticated) {
       console.log("❌ Not authenticated - isAuthenticated:", isAuthenticated, "user:", user, "hasToken:", hasToken, "hasUser:", hasUser)
       
-      // Limpiar estado inconsistente
+      // Solo limpiar si hay inconsistencias en localStorage
       if (!hasToken || !hasUser) {
         localStorage.removeItem("accessToken")
         localStorage.removeItem("refreshToken")
@@ -299,7 +295,7 @@ export default function LabReservationPage() {
             style={{ backgroundImage: "url('/fondo.png')" }}
           >
             <h1 className="text-5xl md:text-6xl font-bold text-gray-600 px-6 py-3 rounded-lg" style={{ WebkitTextStroke: '2px #fbbf24' }}>
-              {isEditing ? 'Editar Reserva' : 'Reserva de Aulas'}
+              {isEditing ? 'Editar Reserva' : 'Reservas de Aulas'}
             </h1>
           </div>
         </div>
@@ -331,24 +327,26 @@ export default function LabReservationPage() {
           />
         ) : (
           <div className="backdrop-blur-sm bg-white/70 dark:bg-slate-800/70 rounded-2xl border border-white/20 shadow-xl mx-4">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col items-center">
-              <TabsList className="grid grid-cols-2 mx-auto mt-6 mb-0 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-slate-700 dark:to-slate-600" style={{ width: '1450px' }}>
-                <TabsTrigger
-                  value="browse"
-                  className="data-[state=active]:bg-white data-[state=active]:text-blue-600 font-medium"
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  Explorar Aulas
-                </TabsTrigger>
-                <TabsTrigger
-                  value="reserve"
-                  disabled={!selectedLab}
-                  className="data-[state=active]:bg-white data-[state=active]:text-purple-600 font-medium"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Continuar Reserva
-                </TabsTrigger>
-              </TabsList>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <div className="flex justify-center p-6 pb-0">
+                <TabsList className="grid grid-cols-2 w-full max-w-2xl bg-gradient-to-r from-blue-100 to-purple-100 dark:from-slate-700 dark:to-slate-600">
+                  <TabsTrigger
+                    value="browse"
+                    className="data-[state=active]:bg-white data-[state=active]:text-blue-600 font-medium"
+                  >
+                    <Search className="h-4 w-4 mr-2" />
+                    Explorar Aulas
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="reserve"
+                    disabled={!selectedLab}
+                    className="data-[state=active]:bg-white data-[state=active]:text-purple-600 font-medium"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Continuar Reserva
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="browse" className="p-6">
                 {/* Filtros */}
@@ -462,8 +460,15 @@ export default function LabReservationPage() {
                         key={lab._id}
                         lab={{...lab, color: colorClass}}
                         onSelect={() => {
-                          setSelectedLab(lab._id)
-                          form.setValue("labId", lab._id)
+                          // Si ya está seleccionado, deseleccionar
+                          if (selectedLab === lab._id) {
+                            setSelectedLab(null)
+                            form.setValue("labId", "")
+                          } else {
+                            // Si no está seleccionado, seleccionar
+                            setSelectedLab(lab._id)
+                            form.setValue("labId", lab._id)
+                          }
                         }}
                         isSelected={selectedLab === lab._id}
                       />
@@ -471,17 +476,6 @@ export default function LabReservationPage() {
                   })}
                 </div>
 
-                {selectedLab && (
-                  <div className="mt-8 flex justify-center">
-                    <Button
-                      onClick={handleContinueToReservation}
-                      className="bg-gradient-to-r from-yellow-700 to-yellow-700 hover:from-yellow-700 hover:to-yellow-700 text-white font-medium px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-                      size="lg"
-                    >
-                      Continuar a la Reserva
-                    </Button>
-                  </div>
-                )}
               </TabsContent>
 
               <TabsContent value="reserve" className="p-6">
@@ -553,6 +547,7 @@ export default function LabReservationPage() {
                                       date.getDay() === 6
                                     }
                                     className="rounded-md border bg-white dark:bg-slate-800"
+                                    locale={es}
                                   />
                                   <FormDescription className="text-blue-600 dark:text-blue-400">
                                     Selecciona un día de semana dentro de los próximos 3 meses
@@ -637,13 +632,12 @@ export default function LabReservationPage() {
                                 </FormLabel>
                                 <FormControl>
                                   <Textarea
-                                    placeholder="Describe el propósito de tu reserva de aula (opcional)"
+                                    placeholder="Describe brevemente el proyecto o actividad que planeas realizar"
                                     className="resize-none bg-white dark:bg-slate-800"
                                     {...field}
                                   />
                                 </FormControl>
                                 <FormDescription className="text-orange-600 dark:text-orange-400">
-                                  Describe brevemente el proyecto o actividad que planeas realizar (opcional)
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>

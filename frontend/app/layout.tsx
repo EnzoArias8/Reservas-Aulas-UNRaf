@@ -7,8 +7,8 @@ import { AuthProvider } from "@/components/providers/auth-provider"
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata = {
-  title: "Sistema de Reserva de Laboratorios Universitarios",
-  description: "Reserva espacios de laboratorio para fines académicos y de investigación",
+  title: "Reservas de Aulas - UNRaf",
+  description: "Reservas de aulas para fines académicos y de investigación",
     generator: 'v0.dev'
 }
 
