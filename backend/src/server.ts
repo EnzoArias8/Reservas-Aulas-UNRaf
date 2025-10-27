@@ -8,6 +8,7 @@ import authRouter from './routes/auth.routes';
 import labRouter from './routes/lab.routes';
 import reservationRouter from './routes/reservation.routes';
 import userRouter from './routes/user.routes';
+import calendarRouter from './routes/calendar.routes';
 import { errorHandler } from './middleware/error.middleware';
 import { connectDB } from './config/database';
 
@@ -45,6 +46,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/labs', labRouter);
 app.use('/api/reservations', reservationRouter);
 app.use('/api/users', userRouter);
+app.use('/api/admin', calendarRouter);
 
 // Manejo de rutas no encontradas
 app.use('*', (req: Request, res: Response) => {

@@ -14,6 +14,10 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { useLabs, useCreateLab, useUpdateLab } from "@/lib/hooks/use-labs"
 import { useReservations } from "@/lib/hooks/use-reservations"
 import { axiosClient } from "@/lib/api"
+import { Calendar as CalendarIcon, Plus, Trash2, Edit, AlertCircle } from "lucide-react"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import { CalendarAdmin } from "@/components/calendar-admin"
 
 export default function AdminDashboardPage() {
   const [tab, setTab] = useState("labs")
@@ -28,6 +32,7 @@ export default function AdminDashboardPage() {
             <TabsTrigger value="labs">Aulas</TabsTrigger>
             <TabsTrigger value="reservations">Reservas</TabsTrigger>
             <TabsTrigger value="users">Usuarios</TabsTrigger>
+            <TabsTrigger value="calendar">Calendario</TabsTrigger>
           </TabsList>
 
           <TabsContent value="labs" className="mt-6">
@@ -40,6 +45,10 @@ export default function AdminDashboardPage() {
 
           <TabsContent value="users" className="mt-6">
             <UsersAdmin />
+          </TabsContent>
+
+          <TabsContent value="calendar" className="mt-6">
+            <CalendarAdmin />
           </TabsContent>
         </Tabs>
       </div>

@@ -125,6 +125,14 @@ export function Header() {
       requiresAuth: true,
     },
     {
+      href: "/reservas-recurrentes",
+      label: "Reservas Recurrentes",
+      icon: Calendar,
+      active: pathname === "/reservas-recurrentes",
+      requiresAuth: true,
+      roles: ["Profesor"],
+    },
+    {
       href: "/perfil",
       label: "Mi Perfil",
       icon: User,
@@ -135,8 +143,12 @@ export function Header() {
 
   const isAdmin = user?.role === "Admin"
 
-  // Filtrar rutas según si el usuario está autenticado
-  const filteredRoutes = routes.filter((route) => !route.requiresAuth || user)
+  // Filtrar rutas según si el usuario está autenticado y su rol
+  const filteredRoutes = routes.filter((route) => {
+    if (route.requiresAuth && !user) return false
+    if (route.roles && user && !route.roles.includes(user.role)) return false
+    return true
+  })
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white dark:bg-slate-900">
@@ -253,6 +265,14 @@ export function Header() {
                     <span>Mis Reservas</span>
                   </Link>
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/calendario" className="cursor-pointer">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      <span>Gestión de Calendario</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />

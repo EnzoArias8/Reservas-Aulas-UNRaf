@@ -10,12 +10,14 @@ interface TimeRangePickerProps {
   availableTimeSlots: string[]
   selectedTimeSlot: string
   onSelectTimeSlot: (timeSlot: string) => void
+  selectedDate?: Date // Agregar fecha seleccionada para restricciones de sábado
 }
 
 export function TimeRangePicker({
   availableTimeSlots,
   selectedTimeSlot,
   onSelectTimeSlot,
+  selectedDate,
 }: TimeRangePickerProps) {
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
@@ -24,11 +26,24 @@ export function TimeRangePicker({
   // Generar opciones de tiempo cada 15 minutos
   const generateTimeOptions = () => {
     const options = []
-    for (let hour = 8; hour <= 23; hour++) {
-      for (let minute = 0; minute < 60; minute += 15) {
-        if (hour === 23 && minute > 0) break
-        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-        options.push(timeString)
+    const isSaturday = selectedDate?.getDay() === 6
+    
+    if (isSaturday) {
+      // Solo permitir horarios de 8hs a 12hs los sábados
+      for (let hour = 8; hour < 12; hour++) {
+        for (let minute = 0; minute < 60; minute += 15) {
+          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+          options.push(timeString)
+        }
+      }
+    } else {
+      // Horarios normales para otros días
+      for (let hour = 8; hour <= 23; hour++) {
+        for (let minute = 0; minute < 60; minute += 15) {
+          if (hour === 23 && minute > 0) break
+          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+          options.push(timeString)
+        }
       }
     }
     return options
@@ -64,18 +79,38 @@ export function TimeRangePicker({
 
   // Función para verificar si un horario está disponible
   const isTimeAvailable = (time: string) => {
+    const isSaturday = selectedDate?.getDay() === 6
     const timeSlots = []
-    for (let hour = 8; hour <= 23; hour++) {
-      for (let minute = 0; minute < 60; minute += 15) {
-        if (hour === 23 && minute > 0) break
-        const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-        const endMinute = minute + 15
-        const endHour = endMinute >= 60 ? hour + 1 : hour
-        const endMinuteAdjusted = endMinute >= 60 ? endMinute - 60 : endMinute
-        
-        if (endHour <= 23) {
-          const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteAdjusted.toString().padStart(2, '0')}`
-          timeSlots.push(`${startTime} - ${endTime}`)
+    
+    if (isSaturday) {
+      // Solo permitir horarios de 8hs a 12hs los sábados
+      for (let hour = 8; hour < 12; hour++) {
+        for (let minute = 0; minute < 60; minute += 15) {
+          const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+          const endMinute = minute + 15
+          const endHour = endMinute >= 60 ? hour + 1 : hour
+          const endMinuteAdjusted = endMinute >= 60 ? endMinute - 60 : endMinute
+          
+          if (endHour < 12) {
+            const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteAdjusted.toString().padStart(2, '0')}`
+            timeSlots.push(`${startTime} - ${endTime}`)
+          }
+        }
+      }
+    } else {
+      // Horarios normales para otros días
+      for (let hour = 8; hour <= 23; hour++) {
+        for (let minute = 0; minute < 60; minute += 15) {
+          if (hour === 23 && minute > 0) break
+          const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+          const endMinute = minute + 15
+          const endHour = endMinute >= 60 ? hour + 1 : hour
+          const endMinuteAdjusted = endMinute >= 60 ? endMinute - 60 : endMinute
+          
+          if (endHour <= 23) {
+            const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteAdjusted.toString().padStart(2, '0')}`
+            timeSlots.push(`${startTime} - ${endTime}`)
+          }
         }
       }
     }
@@ -109,6 +144,14 @@ export function TimeRangePicker({
 
   return (
     <div className="space-y-4">
+      {selectedDate?.getDay() === 6 && (
+        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800">
+            <strong>Nota:</strong> Los sábados solo están disponibles para reservas de 8:00 a 12:00.
+          </p>
+        </div>
+      )}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="text-sm font-medium text-gray-700 mb-2 block">

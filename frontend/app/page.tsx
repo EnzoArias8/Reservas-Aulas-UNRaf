@@ -5,6 +5,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -28,6 +29,25 @@ import { Toaster } from "@/components/ui/toaster"
 import { useAuth } from "@/lib/hooks/use-auth"
 import { useCreateReservation, useReservationById } from "@/lib/hooks/use-reservations"
 import { useAvailableTimeSlots, useLabs } from "@/lib/hooks/use-labs"
+import { useCalendarRestrictions } from "@/lib/hooks/use-calendar-restrictions"
+import { axiosClient } from "@/lib/api"
+
+const DAYS_OF_WEEK = [
+  { value: 1, label: "Lunes" },
+  { value: 2, label: "Martes" },
+  { value: 3, label: "Miércoles" },
+  { value: 4, label: "Jueves" },
+  { value: 5, label: "Viernes" },
+  { value: 6, label: "Sábado" },
+  { value: 0, label: "Domingo" }
+]
+
+const TIME_SLOTS = [
+  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+  "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30",
+  "20:00", "20:30", "21:00", "21:30", "22:00"
+]
 
 const formSchema = z.object({
   labId: z.string({
@@ -57,6 +77,17 @@ export default function LabReservationPage() {
   const [activeTab, setActiveTab] = useState("browse")
   const [createdReservation, setCreatedReservation] = useState<any>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [isWeeklyReservation, setIsWeeklyReservation] = useState(false)
+  
+  // Estados para reserva semanal
+  const [weeklyForm, setWeeklyForm] = useState({
+    dayOfWeek: 1, // 1 = Lunes
+    startTime: "08:00",
+    endTime: "10:00",
+    semester: "",
+    purpose: "",
+    attendees: 1
+  })
   
   // Estados para preservar datos del formulario durante login
   const [pendingFormData, setPendingFormData] = useState<any>(null)
@@ -68,11 +99,21 @@ export default function LabReservationPage() {
   const [capacityFilter, setCapacityFilter] = useState("")
   const [equipmentFilter, setEquipmentFilter] = useState("")
 
+  // Estados para datos adicionales
+  const [semesters, setSemesters] = useState<any[]>([])
+  const [loadingSemesters, setLoadingSemesters] = useState(false)
+
   // ✅ HOOKS REALES - Reemplaza localStorage y simulaciones
   const { user, isLoading: authLoading } = useAuth()
   const isAuthenticated = !!user
   const createReservationMutation = useCreateReservation()
   const { data: editReservation, isLoading: isLoadingEditReservation } = useReservationById(editReservationId)
+  const { 
+    isDateAvailable, 
+    getDateRestrictionInfo, 
+    getActiveSemester,
+    loading: restrictionsLoading 
+  } = useCalendarRestrictions()
 
   // ✅ El hook useAuth ya carga el usuario automáticamente
 
@@ -89,6 +130,25 @@ export default function LabReservationPage() {
       localStorage.removeItem("accessToken")
       localStorage.removeItem("refreshToken") 
       localStorage.removeItem("currentUser")
+    }
+  }, [isAuthenticated, user])
+
+  // Cargar cuatrimestres para reservas semanales
+  useEffect(() => {
+    const loadSemesters = async () => {
+      setLoadingSemesters(true)
+      try {
+        const response = await axiosClient.get("/admin/semesters")
+        setSemesters(response.data?.data || response.data || [])
+      } catch (error) {
+        console.error("Error loading semesters:", error)
+      } finally {
+        setLoadingSemesters(false)
+      }
+    }
+    
+    if (isAuthenticated && user?.role === "Profesor") {
+      loadSemesters()
     }
   }, [isAuthenticated, user])
 
@@ -277,6 +337,55 @@ export default function LabReservationPage() {
         title: "Sesión iniciada",
         description: "Ahora puedes completar tu reserva",
         className: "bg-green-50 border-green-200 text-green-800",
+      })
+    }
+  }
+
+  // Función para manejar reservas semanales
+  const handleWeeklyReservation = async () => {
+    if (!selectedLab || !weeklyForm.semester) {
+      toast({
+        title: "Error",
+        description: "Por favor completa todos los campos requeridos",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      const response = await axiosClient.post("/reservations/recurring", {
+        labId: selectedLab,
+        dayOfWeek: weeklyForm.dayOfWeek,
+        startTime: weeklyForm.startTime,
+        endTime: weeklyForm.endTime,
+        semester: weeklyForm.semester,
+        purpose: weeklyForm.purpose,
+        attendees: weeklyForm.attendees
+      })
+
+      toast({
+        title: "Reserva semanal creada",
+        description: "Tu reserva semanal se ha creado exitosamente",
+        className: "bg-green-50 border-green-200 text-green-800",
+      })
+
+      // Limpiar formulario
+      setWeeklyForm({
+        dayOfWeek: 1,
+        startTime: "08:00",
+        endTime: "10:00",
+        semester: "",
+        purpose: "",
+        attendees: 1
+      })
+      setIsWeeklyReservation(false)
+      setSelectedLab(null)
+      setActiveTab("browse")
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Error al crear la reserva semanal",
+        variant: "destructive"
       })
     }
   }
@@ -523,7 +632,145 @@ export default function LabReservationPage() {
 
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Opción de reserva semanal para profesores */}
+                        {isAuthenticated && user?.role === "Profesor" && (
+                          <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="text-lg font-medium text-purple-800 dark:text-purple-200">
+                                Opciones de Reserva
+                              </h3>
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  variant={!isWeeklyReservation ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setIsWeeklyReservation(false)}
+                                >
+                                  Reserva Única
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant={isWeeklyReservation ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setIsWeeklyReservation(true)}
+                                >
+                                  Reserva Semanal
+                                </Button>
+                              </div>
+                            </div>
+                            {isWeeklyReservation && (
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <Label htmlFor="dayOfWeek">Día de la Semana</Label>
+                                    <select
+                                      id="dayOfWeek"
+                                      value={weeklyForm.dayOfWeek}
+                                      onChange={(e) => setWeeklyForm({...weeklyForm, dayOfWeek: parseInt(e.target.value)})}
+                                      className="w-full p-2 border border-gray-300 rounded-md"
+                                      required
+                                    >
+                                      {DAYS_OF_WEEK.map((day) => (
+                                        <option key={day.value} value={day.value}>
+                                          {day.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="semester">Cuatrimestre</Label>
+                                    <select
+                                      id="semester"
+                                      value={weeklyForm.semester}
+                                      onChange={(e) => setWeeklyForm({...weeklyForm, semester: e.target.value})}
+                                      className="w-full p-2 border border-gray-300 rounded-md"
+                                      required
+                                    >
+                                      <option value="">Seleccionar cuatrimestre</option>
+                                      {semesters.map((semester) => (
+                                        <option key={semester._id} value={semester._id}>
+                                          {semester.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="startTime">Hora de Inicio</Label>
+                                    <select
+                                      id="startTime"
+                                      value={weeklyForm.startTime}
+                                      onChange={(e) => setWeeklyForm({...weeklyForm, startTime: e.target.value})}
+                                      className="w-full p-2 border border-gray-300 rounded-md"
+                                      required
+                                    >
+                                      {TIME_SLOTS.map((time) => (
+                                        <option key={time} value={time}>
+                                          {time}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="endTime">Hora de Fin</Label>
+                                    <select
+                                      id="endTime"
+                                      value={weeklyForm.endTime}
+                                      onChange={(e) => setWeeklyForm({...weeklyForm, endTime: e.target.value})}
+                                      className="w-full p-2 border border-gray-300 rounded-md"
+                                      required
+                                    >
+                                      {TIME_SLOTS.map((time) => (
+                                        <option key={time} value={time}>
+                                          {time}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="attendees">Número de Asistentes</Label>
+                                    <Input
+                                      id="attendees"
+                                      type="number"
+                                      min="1"
+                                      value={weeklyForm.attendees}
+                                      onChange={(e) => setWeeklyForm({...weeklyForm, attendees: parseInt(e.target.value)})}
+                                      required
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <Label htmlFor="purpose">Propósito de la Clase</Label>
+                                  <Input
+                                    id="purpose"
+                                    value={weeklyForm.purpose}
+                                    onChange={(e) => setWeeklyForm({...weeklyForm, purpose: e.target.value})}
+                                    placeholder="Ej: Clase de Matemática I - Análisis"
+                                  />
+                                </div>
+                                <div className="flex gap-2 pt-4">
+                                  <Button
+                                    type="button"
+                                    onClick={handleWeeklyReservation}
+                                    className="flex-1 bg-purple-600 hover:bg-purple-700"
+                                  >
+                                    Crear Reserva Semanal
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setIsWeeklyReservation(false)}
+                                  >
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {!isWeeklyReservation && (
+                          <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
                             <FormField
                               control={form.control}
@@ -540,17 +787,30 @@ export default function LabReservationPage() {
                                       field.onChange(date)
                                       setDate(date)
                                     }}
-                                    disabled={(date) =>
-                                      date < new Date() ||
-                                      date > new Date(new Date().setMonth(new Date().getMonth() + 3)) ||
-                                      date.getDay() === 0 ||
-                                      date.getDay() === 6
-                                    }
+                                    disabled={(date) => {
+                                      // Fechas pasadas
+                                      if (date < new Date()) return true
+                                      
+                                      // Domingos
+                                      if (date.getDay() === 0) return true
+                                      
+                                      // Sábados solo están disponibles para reservas de 8hs a 12hs
+                                      // (esto se manejará en el componente de horarios)
+                                      
+                                      // Restricciones de calendario académico
+                                      if (!isDateAvailable(date)) return true
+                                      
+                                      return false
+                                    }}
                                     className="rounded-md border bg-white dark:bg-slate-800"
                                     locale={es}
                                   />
                                   <FormDescription className="text-blue-600 dark:text-blue-400">
-                                    Selecciona un día de semana dentro de los próximos 3 meses
+                                    {getActiveSemester() ? (
+                                      <>Cuatrimestre activo: {getActiveSemester()?.name}</>
+                                    ) : (
+                                      "No hay cuatrimestre activo configurado"
+                                    )}
                                   </FormDescription>
                                   <FormMessage />
                                 </FormItem>
@@ -578,6 +838,7 @@ export default function LabReservationPage() {
                                         availableTimeSlots={availableTimeSlots}
                                         selectedTimeSlot={field.value}
                                         onSelectTimeSlot={field.onChange}
+                                        selectedDate={date}
                                       />
                                     )}
                                     {availableTimeSlots.length === 0 && date && !slotsLoading && (
@@ -645,34 +906,36 @@ export default function LabReservationPage() {
                           />
                         </div>
 
-                        <div className="flex justify-between pt-4">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setActiveTab("browse")}
-                            className="border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
-                          >
-                            Volver a Aulas
-                          </Button>
-                          <Button
-                            type="submit"
-                            disabled={
-                              (availableTimeSlots.length === 0 && !!date && !slotsLoading) ||
-                              !isAuthenticated ||
-                              createReservationMutation.isPending
-                            }
-                            className="bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-blue-700 text-white font-medium px-8 shadow-lg hover:shadow-xl transition-all duration-200"
-                          >
-                            {createReservationMutation.isPending ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Enviando reserva...
-                              </>
-                            ) : (
-                              isEditing ? "Actualizar Reserva" : "Enviar Reserva"
-                            )}
-                          </Button>
-                        </div>
+                            <div className="flex justify-between pt-4">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setActiveTab("browse")}
+                                className="border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
+                              >
+                                Volver a Aulas
+                              </Button>
+                              <Button
+                                type="submit"
+                                disabled={
+                                  (availableTimeSlots.length === 0 && !!date && !slotsLoading) ||
+                                  !isAuthenticated ||
+                                  createReservationMutation.isPending
+                                }
+                                className="bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-blue-700 text-white font-medium px-8 shadow-lg hover:shadow-xl transition-all duration-200"
+                              >
+                                {createReservationMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Enviando reserva...
+                                  </>
+                                ) : (
+                                  isEditing ? "Actualizar Reserva" : "Enviar Reserva"
+                                )}
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </form>
                     </Form>
                   </CardContent>
