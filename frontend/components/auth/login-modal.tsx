@@ -111,7 +111,7 @@ export function LoginModal({ isOpen, onClose, onOpenRegister, onLoginSuccess }: 
         className: "bg-green-50 border-green-200 text-green-800",
       })
 
-      // Llamar callback si existe
+      // Llamar callback inmediatamente para actualizar el estado
       if (onLoginSuccess) {
         onLoginSuccess({
           id: user?._id || user?.id,
@@ -123,14 +123,10 @@ export function LoginModal({ isOpen, onClose, onOpenRegister, onLoginSuccess }: 
         })
       }
 
-      // Cerrar modal después de un momento SOLO en caso de éxito
-      // Solo hacer router.refresh() si no hay callback de éxito (para no perder datos del formulario)
+      // Cerrar modal inmediatamente
       setTimeout(() => {
         onClose()
-        if (!onLoginSuccess) {
-          router.refresh()
-        }
-      }, 1500)
+      }, 500)
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || "Error al iniciar sesión"
       
@@ -241,7 +237,7 @@ export function LoginModal({ isOpen, onClose, onOpenRegister, onLoginSuccess }: 
             <Button
               type="submit"
               disabled={isLoading}
-              className="sm:order-2 order-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              className="sm:order-2 order-1"
             >
               {isLoading ? (
                 <>

@@ -15,63 +15,59 @@ export function useUserReservations(options?: { enabled?: boolean }) {
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [error, setError] = useState<Error | null>(null)
 
+  const fetchReservations = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      // Usar axiosClient que incluye el token automáticamente
+      const res = await axiosClient.get("/reservations/me")
+      
+      // El backend ahora devuelve { upcoming, past } directamente
+      const responseData = res.data?.data || {}
+      const upcoming: Reservation[] = responseData.upcoming || []
+      const past: Reservation[] = responseData.past || []
+
+      setData({ upcoming, past })
+    } catch (e: any) {
+      setError(e)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
 
-    async function fetchReservations() {
-      setIsLoading(true)
-      setError(null)
-      try {
-        // Usar axiosClient que incluye el token automáticamente
-        const res = await axiosClient.get("/reservations/me")
-        const items: Reservation[] = res.data?.data || res.data || []
-
-        // Separar próximas y pasadas según la fecha
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-
-        const upcoming: Reservation[] = []
-        const past: Reservation[] = []
-
-        items.forEach((r) => {
-          const d = parseISO(r.date)
-          if (isBefore(d, today)) past.push(r)
-          else upcoming.push(r)
-        })
-
-        if (!cancelled) setData({ upcoming, past })
-      } catch (e: any) {
-        if (!cancelled) setError(e)
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
+    async function loadReservations() {
+      await fetchReservations()
     }
 
-    fetchReservations()
+    loadReservations()
     return () => {
       cancelled = true
     }
-  }, [enabled])
+  }, [enabled, fetchReservations])
 
-  return { data, isLoading, error }
+  return { data, isLoading, error, refetch: fetchReservations }
 }
 
-export function useCancelReservation() {
+export function useCancelReservation(onSuccess?: () => void) {
   const [isPending, setIsPending] = useState(false)
 
   const mutate = useCallback(async (reservationId: string) => {
     setIsPending(true)
     try {
-      // Usar axiosClient para DELETE
-      await axiosClient.delete(`/reservations/${reservationId}`)
+      // Usar axiosClient para PUT con cancel
+      await axiosClient.put(`/reservations/${reservationId}/cancel`)
+      if (onSuccess) onSuccess()
       return true
     } catch (e) {
       throw e
     } finally {
       setIsPending(false)
     }
-  }, [])
+  }, [onSuccess])
 
   return { mutate, isPending }
 }

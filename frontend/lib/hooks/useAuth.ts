@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 type User = {
   _id?: string
@@ -16,6 +16,7 @@ type User = {
 export function useAuth() {
   const [user, setUser] = useState<User>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const lastRawRef = useRef<string | null>(null)
 
   const loadUser = () => {
     try {
@@ -24,6 +25,12 @@ export function useAuth() {
         return
       }
       const raw = localStorage.getItem("currentUser")
+      // Evitar setState si no cambió el contenido
+      if (raw === lastRawRef.current) {
+        setIsLoading(false)
+        return
+      }
+      lastRawRef.current = raw
       if (raw) {
         const userData = JSON.parse(raw)
         setUser({
@@ -57,13 +64,9 @@ export function useAuth() {
     }
     
     window.addEventListener('storage', handleStorageChange)
-    
-    // También verificar periódicamente (para cambios en la misma pestaña)
-    const interval = setInterval(loadUser, 1000)
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange)
-      clearInterval(interval)
     }
   }, [])
 

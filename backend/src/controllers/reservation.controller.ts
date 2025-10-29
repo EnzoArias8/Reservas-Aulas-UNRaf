@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { Reservation, IReservation } from '../models/Reservation.model';
 import { Lab, ILab } from '../models/Lab.model';
+import { RecurringReservation } from '../models/RecurringReservation.model';
+import { Semester } from '../models/Semester.model';
 import { AppError } from '../utils/AppError';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -45,6 +47,32 @@ export const createReservation = async (req: AuthRequest, res: Response, next: N
       // Verificar superposición
       if (!(endMinutes <= existingStartMinutes || startMinutes >= existingEndMinutes)) {
         return next(new AppError('Este laboratorio ya está reservado en un horario que se superpone con tu selección.', 409));
+      }
+    }
+
+    // 2.b Validar superposición con reservas recurrentes activas
+    const targetDate = new Date(date);
+    const dayOfWeek = targetDate.getDay();
+    const activeSemesters = await Semester.find({ isActive: true });
+    const activeSemesterIds = activeSemesters
+      .filter(s => {
+        const d = new Date(targetDate.toISOString().split('T')[0]);
+        const start = new Date(new Date(s.startDate).toISOString().split('T')[0]);
+        const end = new Date(new Date(s.endDate).toISOString().split('T')[0]);
+        return d >= start && d <= end;
+      })
+      .map(s => s._id);
+
+    if (activeSemesterIds.length > 0) {
+      const recs = await RecurringReservation.find({ labId, dayOfWeek, semester: { $in: activeSemesterIds }, isActive: true });
+      for (const r of recs) {
+        const [rStartH, rStartM] = r.startTime.split(':').map(Number);
+        const [rEndH, rEndM] = r.endTime.split(':').map(Number);
+        const recStart = rStartH * 60 + rStartM;
+        const recEnd = rEndH * 60 + rEndM;
+        if (!(endMinutes <= recStart || startMinutes >= recEnd)) {
+          return next(new AppError('Este horario se superpone con una reserva recurrente activa.', 409));
+        }
       }
     }
 
@@ -202,15 +230,31 @@ export const getAvailableTimeSlotsForLab = async (req: AuthRequest, res: Respons
       return next(new AppError('labId y date son requeridos', 400));
     }
 
-    // Generar todos los horarios posibles de 15 minutos desde 08:00 hasta 23:00
+    // Generar horarios posibles según el día de la semana
     const allTimeSlots = [];
-    for (let hour = 8; hour < 23; hour++) {
+    const dt = new Date(String(date));
+    const dow = dt.getDay();
+
+    // Domingos: no hay horarios disponibles
+    if (dow === 0) {
+      return res.status(200).json({ success: true, data: { availableSlots: [], allSlots: [] } });
+    }
+
+    const startHour = 8;
+    const endHourExclusive = dow === 6 ? 12 : 23; // Sábado hasta 12:00, otros días hasta 23:00
+
+    for (let hour = startHour; hour < endHourExclusive; hour++) {
       for (let minute = 0; minute < 60; minute += 15) {
         const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
         const endHour = minute === 45 ? hour + 1 : hour;
         const endMinute = minute === 45 ? 0 : minute + 15;
         const endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
-        
+
+        // En sábado, asegurarse de que el fin no exceda 12:00
+        if (dow === 6 && (endHour > 12 || (endHour === 12 && endMinute > 0))) {
+          continue;
+        }
+
         allTimeSlots.push(`${startTime} - ${endTime}`);
       }
     }
@@ -221,6 +265,19 @@ export const getAvailableTimeSlotsForLab = async (req: AuthRequest, res: Respons
       date: date,
       status: { $in: ['confirmed'] }
     });
+
+    // Obtener reservas recurrentes que apliquen para este día
+    // dow ya calculado arriba
+    const active = await Semester.find({ isActive: true });
+    const activeIds = active
+      .filter(s => {
+        const d = new Date(dt.toISOString().split('T')[0]);
+        const start = new Date(new Date(s.startDate).toISOString().split('T')[0]);
+        const end = new Date(new Date(s.endDate).toISOString().split('T')[0]);
+        return d >= start && d <= end;
+      })
+      .map(s => s._id);
+    const recurring = await RecurringReservation.find({ labId: labId, dayOfWeek: dow, semester: { $in: activeIds }, isActive: true });
 
     // Función para verificar si un slot está disponible
     const isSlotAvailable = (timeSlot: string) => {
@@ -241,6 +298,17 @@ export const getAvailableTimeSlotsForLab = async (req: AuthRequest, res: Respons
         const existingEndMinutes = existingEndHour * 60 + existingEndMinute;
 
         // Si hay superposición, el slot no está disponible
+        if (startMinutes < existingEndMinutes && endMinutes > existingStartMinutes) {
+          return false;
+        }
+      }
+      // Verificar con recurrentes también
+      for (const r of recurring) {
+        const [existingStartTime, existingEndTime] = [r.startTime, r.endTime];
+        const [existingStartHour, existingStartMinute] = existingStartTime.split(':').map(Number);
+        const [existingEndHour, existingEndMinute] = existingEndTime.split(':').map(Number);
+        const existingStartMinutes = existingStartHour * 60 + existingStartMinute;
+        const existingEndMinutes = existingEndHour * 60 + existingEndMinute;
         if (startMinutes < existingEndMinutes && endMinutes > existingStartMinutes) {
           return false;
         }
@@ -288,9 +356,30 @@ export const getMyReservations = async (req: AuthRequest, res: Response, next: N
   try {
     if (!req.user) return next(new AppError('No autorizado', 401));
     const reservations = await Reservation.find({ userId: req.user.id })
-      .populate('labId')
-      .populate('userId', 'email');
-    res.status(200).json({ success: true, data: reservations });
+      .populate('lab', 'name building floor capacity equipment')
+      .populate('user', 'email nombre apellido');
+    
+    // Formatear las reservas para enviar upcoming y past separadas
+    const upcoming: any[] = [];
+    const past: any[] = [];
+    const now = new Date();
+    
+    reservations.forEach(reservation => {
+      const reservationObj = reservation.toObject();
+      if (new Date(reservation.date) >= now) {
+        upcoming.push(reservationObj);
+      } else {
+        past.push(reservationObj);
+      }
+    });
+    
+    res.status(200).json({ 
+      success: true, 
+      data: {
+        upcoming,
+        past
+      }
+    });
   } catch (error) {
     next(error);
   }

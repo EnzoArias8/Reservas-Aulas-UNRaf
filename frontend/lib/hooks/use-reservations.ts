@@ -9,6 +9,9 @@ export const useReservations = (filters?: ReservationFilters) => {
     queryKey: ["reservations", filters],
     queryFn: () => ReservationService.getReservations(filters),
     staleTime: 2 * 60 * 1000, // 2 minutos
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   })
 }
 
@@ -17,6 +20,9 @@ export const useUserReservations = (userId?: string) => {
     queryKey: ["user-reservations", userId],
     queryFn: () => ReservationService.getUserReservations(userId),
     staleTime: 1 * 60 * 1000, // 1 minuto
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   })
 }
 
@@ -25,6 +31,9 @@ export const useReservation = (id: string) => {
     queryKey: ["reservation", id],
     queryFn: () => ReservationService.getReservationById(id),
     enabled: !!id,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   })
 }
 
@@ -87,5 +96,8 @@ export const useReservationById = (id: string | null) => {
     queryKey: ["reservation", id],
     queryFn: () => ReservationService.getReservationById(id!),
     enabled: !!id,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   })
 }

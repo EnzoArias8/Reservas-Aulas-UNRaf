@@ -14,23 +14,18 @@ import {
 
 const router = Router();
 
-// Todas las rutas requieren autenticación y rol de Admin
-router.use(protect, authorize('Admin'));
-
-// Rutas de cuatrimestres
+// Rutas públicas de lectura (GET) - sin autenticación requerida
 router.get('/semesters', getSemesters);
-router.post('/semesters', createSemester);
-router.delete('/semesters/:id', deleteSemester);
-
-// Rutas de semanas de examen
 router.get('/exam-weeks', getExamWeeks);
-router.post('/exam-weeks', createExamWeek);
-router.delete('/exam-weeks/:id', deleteExamWeek);
-
-// Rutas de feriados
 router.get('/holidays', getHolidays);
-router.post('/holidays', createHoliday);
-router.delete('/holidays/:id', deleteHoliday);
+
+// Rutas de escritura (POST/DELETE) - requieren autenticación y rol de Admin
+router.post('/semesters', protect, authorize('Admin'), createSemester);
+router.delete('/semesters/:id', protect, authorize('Admin'), deleteSemester);
+router.post('/exam-weeks', protect, authorize('Admin'), createExamWeek);
+router.delete('/exam-weeks/:id', protect, authorize('Admin'), deleteExamWeek);
+router.post('/holidays', protect, authorize('Admin'), createHoliday);
+router.delete('/holidays/:id', protect, authorize('Admin'), deleteHoliday);
 
 export default router;
 

@@ -29,9 +29,10 @@ export function useCalendarRestrictions() {
     examWeeks: [],
     holidays: []
   })
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    // Cargar restricciones para todos los usuarios (las rutas ahora son públicas)
     loadRestrictions()
   }, [])
 
@@ -66,10 +67,16 @@ export function useCalendarRestrictions() {
   // Verificar si una fecha está dentro de un cuatrimestre activo
   const isDateInActiveSemester = (date: Date): boolean => {
     const activeSemester = restrictions.semesters.find(s => s.isActive)
-    if (!activeSemester) return false
+    if (!activeSemester) {
+      return false
+    }
 
     const dateStr = date.toISOString().split('T')[0]
-    return dateStr >= activeSemester.startDate && dateStr <= activeSemester.endDate
+    // Normalizar las fechas de inicio y fin a solo fecha (sin tiempo)
+    const startDate = activeSemester.startDate.split('T')[0]
+    const endDate = activeSemester.endDate.split('T')[0]
+    
+    return dateStr >= startDate && dateStr <= endDate
   }
 
   // Verificar si una fecha es feriado

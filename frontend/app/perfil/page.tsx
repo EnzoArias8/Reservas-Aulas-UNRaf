@@ -269,7 +269,7 @@ export default function PerfilPage() {
     toast({
       title: "Sesión cerrada",
       description: "Has cerrado sesión correctamente.",
-      className: "bg-blue-50 border-blue-200 text-blue-800",
+      className: "bg-primary/10 border-primary/20 text-primary",
     })
     router.push("/")
   }
@@ -287,7 +287,7 @@ export default function PerfilPage() {
   // Si no hay usuario, mostrar mensaje
   if (!userData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-primary/5 to-secondary/5 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
         <div className="container py-10">
           <Toaster />
           <Card className="border-0 shadow-xl bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
@@ -299,7 +299,7 @@ export default function PerfilPage() {
               <p className="text-muted-foreground text-center mb-6">Debes iniciar sesión para acceder a esta página.</p>
               <Button
                 asChild
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 <Link href="/">Volver al inicio</Link>
               </Button>
@@ -311,10 +311,10 @@ export default function PerfilPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-primary/5 to-secondary/5 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="container py-10">
         <Toaster />
-        <div className="mb-6">
+        <div className="mb-6 text-center">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
             Mi Perfil
           </h1>
@@ -341,7 +341,7 @@ export default function PerfilPage() {
                   <div className="flex items-center gap-2">
                     <Badge
                       variant="outline"
-                      className="px-3 py-1 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200 text-blue-700 dark:from-blue-900/20 dark:to-purple-900/20 dark:border-blue-800 dark:text-blue-300"
+                      className="px-3 py-1 bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20 text-primary dark:from-primary/20 dark:to-secondary/20 dark:border-primary/30 dark:text-primary"
                     >
                       <Shield className="h-3.5 w-3.5 mr-1" />
                       {userData.role || "Usuario"}
@@ -369,7 +369,7 @@ export default function PerfilPage() {
                   <AlertDialogTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-full border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/20 bg-transparent"
+                      className="w-full border-primary/30 text-primary hover:bg-primary/10 dark:border-primary/50 dark:text-primary dark:hover:bg-primary/20 bg-transparent"
                     >
                       <LogOut className="h-4 w-4 mr-2" />
                       Cerrar Sesión
@@ -385,7 +385,7 @@ export default function PerfilPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleLogout} className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <AlertDialogAction onClick={handleLogout} className="bg-primary hover:bg-primary/90 text-white">
                         Sí, cerrar sesión
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -419,17 +419,17 @@ export default function PerfilPage() {
           <div className="md:col-span-2">
             <div className="backdrop-blur-sm bg-white/70 dark:bg-slate-800/70 rounded-2xl border border-white/20 shadow-xl">
               <Tabs defaultValue="informacion" className="w-full flex flex-col items-center">
-                <TabsList className="grid grid-cols-2 mx-auto mt-6 mb-0 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-slate-700 dark:to-slate-600 w-full max-w-md">
+                <TabsList className="grid grid-cols-2 mx-auto mt-6 mb-0 bg-gradient-to-r from-primary/10 to-secondary/10 dark:from-slate-700 dark:to-slate-600 w-full max-w-md">
                   <TabsTrigger
                     value="informacion"
-                    className="data-[state=active]:bg-white data-[state=active]:text-blue-600 font-medium"
+                    className="data-[state=active]:bg-white data-[state=active]:text-primary font-medium"
                   >
                     <User className="h-4 w-4 mr-2" />
                     Información Personal
                   </TabsTrigger>
                   <TabsTrigger
                     value="seguridad"
-                    className="data-[state=active]:bg-white data-[state=active]:text-purple-600 font-medium"
+                    className="data-[state=active]:bg-white data-[state=active]:text-secondary font-medium"
                   >
                     <Lock className="h-4 w-4 mr-2" />
                     Seguridad
@@ -519,7 +519,7 @@ export default function PerfilPage() {
                           </Button>
                           <Button
                             onClick={handleSave}
-                            className="bg-gradient-to-r from-cyan-600 to-cyan-600 hover:from-cyan-700 hover:to-cyan-700"
+                            className="bg-primary hover:bg-primary/90"
                           >
                             Guardar Cambios
                           </Button>
@@ -527,7 +527,7 @@ export default function PerfilPage() {
                       ) : (
                         <Button
                           onClick={() => setIsEditing(true)}
-                          className="bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-blue-700"
+                          className="bg-primary hover:bg-primary/90"
                         >
                           Editar Información
                         </Button>
@@ -598,7 +598,7 @@ export default function PerfilPage() {
                       <Button 
                         onClick={handleChangePassword}
                         disabled={isChangingPassword}
-                        className="bg-gradient-to-r from-yellow-600 to-yellow-600 hover:from-yellow-700 hover:to-yellow-700 disabled:opacity-50"
+                        className="bg-accent hover:bg-accent/90 disabled:opacity-50"
                       >
                         {isChangingPassword ? "Cambiando..." : "Cambiar Contraseña"}
                       </Button>

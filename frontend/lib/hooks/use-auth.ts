@@ -9,6 +9,7 @@ interface AuthState {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
+  init: () => (() => void) | undefined
   login: (credentials: LoginRequest) => Promise<void>
   register: (userData: RegisterRequest) => Promise<void>
   logout: () => Promise<void>
@@ -22,6 +23,34 @@ export const useAuth = create<AuthState>()(
       user: null,
       isLoading: false,
       isAuthenticated: false,
+
+      // Listener para cambios en localStorage
+      init: () => {
+        if (typeof window === "undefined") return
+        
+        const handleStorageChange = () => {
+          const token = localStorage.getItem("accessToken")
+          if (token) {
+            get().loadUser()
+          } else {
+            set({
+              user: null,
+              isAuthenticated: false,
+              isLoading: false,
+            })
+          }
+        }
+
+        // Escuchar cambios en localStorage
+        window.addEventListener('storage', handleStorageChange)
+        
+        // Cargar usuario inicial
+        get().loadUser()
+
+        return () => {
+          window.removeEventListener('storage', handleStorageChange)
+        }
+      },
 
       login: async (credentials: LoginRequest) => {
         set({ isLoading: true })

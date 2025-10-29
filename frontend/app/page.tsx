@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -39,7 +39,7 @@ const DAYS_OF_WEEK = [
   { value: 4, label: "Jueves" },
   { value: 5, label: "Viernes" },
   { value: 6, label: "Sábado" },
-  { value: 0, label: "Domingo" }
+  // Domingo eliminado para reservas semanales
 ]
 
 const TIME_SLOTS = [
@@ -78,6 +78,8 @@ export default function LabReservationPage() {
   const [createdReservation, setCreatedReservation] = useState<any>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isWeeklyReservation, setIsWeeklyReservation] = useState(false)
+  const confirmationRef = useRef<HTMLDivElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
   
   // Estados para reserva semanal
   const [weeklyForm, setWeeklyForm] = useState({
@@ -88,6 +90,10 @@ export default function LabReservationPage() {
     purpose: "",
     attendees: 1
   })
+
+  // Validación de capacidad en vivo para la reserva semanal
+  const selectedLabObj = labs.find((lab: any) => lab._id === selectedLab)
+  const weeklyCapacityExceeded = !!selectedLabObj && weeklyForm.attendees > (selectedLabObj?.capacity || Infinity)
   
   // Estados para preservar datos del formulario durante login
   const [pendingFormData, setPendingFormData] = useState<any>(null)
@@ -117,23 +123,9 @@ export default function LabReservationPage() {
 
   // ✅ El hook useAuth ya carga el usuario automáticamente
 
-  // ✅ Verificar autenticación en cada render para debug
-  useEffect(() => {
-    console.log("🔍 Auth state changed - isAuthenticated:", isAuthenticated, "user:", user)
-    const token = localStorage.getItem("accessToken")
-    const userData = localStorage.getItem("currentUser")
-    console.log("🔍 Token in localStorage:", !!token, "User in localStorage:", !!userData)
-    
-    // Solo limpiar si hay una inconsistencia real (token pero no user, o viceversa)
-    if ((token && !userData) || (!token && userData)) {
-      console.log("🧹 Cleaning inconsistent auth state")
-      localStorage.removeItem("accessToken")
-      localStorage.removeItem("refreshToken") 
-      localStorage.removeItem("currentUser")
-    }
-  }, [isAuthenticated, user])
+  // Evitar efectos que toquen localStorage repetidamente para no provocar bucles de render/redirect
 
-  // Cargar cuatrimestres para reservas semanales
+  // Cargar cuatrimestres para reservas semanales - Solo si está autenticado y es profesor
   useEffect(() => {
     const loadSemesters = async () => {
       setLoadingSemesters(true)
@@ -142,18 +134,30 @@ export default function LabReservationPage() {
         setSemesters(response.data?.data || response.data || [])
       } catch (error) {
         console.error("Error loading semesters:", error)
+        // Si falla la autenticación, limpiar el estado
+        if (error.response?.status === 401) {
+          localStorage.removeItem("accessToken")
+          localStorage.removeItem("refreshToken")
+          localStorage.removeItem("currentUser")
+        }
       } finally {
         setLoadingSemesters(false)
       }
     }
     
+    // Solo cargar si está autenticado Y es profesor
     if (isAuthenticated && user?.role === "Profesor") {
       loadSemesters()
+    } else {
+      // Limpiar semestres si no es profesor
+      setSemesters([])
     }
   }, [isAuthenticated, user])
 
   // ✅ Cargar aulas desde API - Solo las activas para la vista pública
-  const { data: allLabs = [], isLoading: labsLoading } = useLabs({ isActive: true })
+  // Evitar crear un objeto nuevo en cada render para el queryKey de react-query
+  const activeLabsFilter = useMemo(() => ({ isActive: true }), [])
+  const { data: allLabs = [], isLoading: labsLoading } = useLabs(activeLabsFilter)
 
   // ✅ Filtrar aulas según los filtros aplicados
   const labs = allLabs.filter((lab: any) => {
@@ -215,13 +219,21 @@ export default function LabReservationPage() {
   useEffect(() => {
     if (editReservationId && editReservation) {
       setIsEditing(true)
-      setSelectedLab(editReservation.lab?._id || "")
+      setSelectedLab(
+        editReservation.lab?._id || 
+        (typeof editReservation.labId === 'object' ? editReservation.labId?._id : editReservation.labId) ||
+        ""
+      )
       setDate(new Date(editReservation.date))
       setActiveTab("reserve")
       
       // Precargar el formulario con los datos de la reserva
       form.reset({
-        labId: editReservation.lab?._id || "",
+        labId: (
+          editReservation.lab?._id || 
+          (typeof editReservation.labId === 'object' ? editReservation.labId?._id : editReservation.labId) ||
+          ""
+        ),
         date: new Date(editReservation.date),
         timeSlot: editReservation.timeSlot,
         purpose: editReservation.purpose || "",
@@ -285,6 +297,11 @@ export default function LabReservationPage() {
       // Guardar reserva para mostrar confirmación
       setCreatedReservation(reservation)
       setShowConfirmation(true)
+      setActiveTab("reserve")
+      // Desplazar a la sección de confirmación para que no quede sólo el header visible
+      setTimeout(() => {
+        confirmationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 0)
 
       toast({
         title: "Reserva creada exitosamente",
@@ -352,6 +369,17 @@ export default function LabReservationPage() {
       return
     }
 
+    // Validar capacidad del aula
+    const lab = labs.find((l: any) => l._id === selectedLab)
+    if (lab && weeklyForm.attendees > lab.capacity) {
+      toast({
+        title: "Capacidad excedida",
+        description: `El aula tiene capacidad máxima de ${lab.capacity} asistentes`,
+        variant: "destructive"
+      })
+      return
+    }
+
     try {
       const response = await axiosClient.post("/reservations/recurring", {
         labId: selectedLab,
@@ -403,7 +431,7 @@ export default function LabReservationPage() {
                        flex flex-col justify-start items-center pt-6"
             style={{ backgroundImage: "url('/fondo.png')" }}
           >
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-600 px-6 py-3 rounded-lg" style={{ WebkitTextStroke: '2px #fbbf24' }}>
+            <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent px-6 py-3">
               {isEditing ? 'Editar Reserva' : 'Reservas de Aulas'}
             </h1>
           </div>
@@ -419,23 +447,30 @@ export default function LabReservationPage() {
             </div>
           </div>
         ) : showConfirmation && createdReservation ? (
-          <ReservationConfirmation
-            lab={labs.find((lab: any) => lab._id === selectedLab)}
-            date={date as Date}
-            timeSlot={createdReservation?.timeSlot}
-            purpose={createdReservation?.purpose}
-            attendees={String(createdReservation?.attendees)}
-            reservationId={createdReservation?._id || ""}
-            onClose={() => {
-              setShowConfirmation(false)
-              setCreatedReservation(null)
-              form.reset()
-              setSelectedLab(null)
-              setActiveTab("browse")
-            }}
-          />
+          <div ref={confirmationRef} className="container mx-auto py-10">
+            <ReservationConfirmation
+              lab={labs.find((lab: any) => lab._id === selectedLab)}
+              date={date as Date}
+              timeSlot={createdReservation?.timeSlot}
+              purpose={createdReservation?.purpose}
+              attendees={String(createdReservation?.attendees)}
+              reservationId={createdReservation?._id || ""}
+              onClose={() => {
+                setShowConfirmation(false)
+                setCreatedReservation(null)
+                form.reset()
+                setSelectedLab(null)
+                setActiveTab("reserve")
+                setDate(new Date())
+                // Volver a la sección principal luego de cerrar la confirmación
+                setTimeout(() => {
+                  contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }, 0)
+              }}
+            />
+          </div>
         ) : (
-          <div className="backdrop-blur-sm bg-white/70 dark:bg-slate-800/70 rounded-2xl border border-white/20 shadow-xl mx-4">
+          <div ref={contentRef} className="backdrop-blur-sm bg-white/70 dark:bg-slate-800/70 rounded-2xl border border-white/20 shadow-xl mx-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <div className="flex justify-center p-6 pb-0">
                 <TabsList className="grid grid-cols-2 w-full max-w-2xl bg-gradient-to-r from-blue-100 to-purple-100 dark:from-slate-700 dark:to-slate-600">
@@ -661,7 +696,7 @@ export default function LabReservationPage() {
                             {isWeeklyReservation && (
                               <div className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div>
+                              <div>
                                     <Label htmlFor="dayOfWeek">Día de la Semana</Label>
                                     <select
                                       id="dayOfWeek"
@@ -703,7 +738,10 @@ export default function LabReservationPage() {
                                       className="w-full p-2 border border-gray-300 rounded-md"
                                       required
                                     >
-                                      {TIME_SLOTS.map((time) => (
+                                      {(weeklyForm.dayOfWeek === 6
+                                        ? TIME_SLOTS.filter((t) => t >= "08:00" && t < "12:00")
+                                        : TIME_SLOTS
+                                      ).map((time) => (
                                         <option key={time} value={time}>
                                           {time}
                                         </option>
@@ -719,7 +757,11 @@ export default function LabReservationPage() {
                                       className="w-full p-2 border border-gray-300 rounded-md"
                                       required
                                     >
-                                      {TIME_SLOTS.map((time) => (
+                                      {TIME_SLOTS.filter(t => {
+                                        if (t <= weeklyForm.startTime) return false
+                                        if (weeklyForm.dayOfWeek === 6 && t > "12:00") return false
+                                        return true
+                                      }).map((time) => (
                                         <option key={time} value={time}>
                                           {time}
                                         </option>
@@ -736,6 +778,11 @@ export default function LabReservationPage() {
                                       onChange={(e) => setWeeklyForm({...weeklyForm, attendees: parseInt(e.target.value)})}
                                       required
                                     />
+                                    {selectedLabObj && (
+                                      <p className={`text-sm mt-1 ${weeklyCapacityExceeded ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                        Capacidad máxima: {selectedLabObj.capacity}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                                 <div>
@@ -751,6 +798,7 @@ export default function LabReservationPage() {
                                   <Button
                                     type="button"
                                     onClick={handleWeeklyReservation}
+                                    disabled={weeklyCapacityExceeded}
                                     className="flex-1 bg-purple-600 hover:bg-purple-700"
                                   >
                                     Crear Reserva Semanal
@@ -809,7 +857,14 @@ export default function LabReservationPage() {
                                     {getActiveSemester() ? (
                                       <>Cuatrimestre activo: {getActiveSemester()?.name}</>
                                     ) : (
-                                      "No hay cuatrimestre activo configurado"
+                                      (() => {
+                                        // Si está en modo semanal y hay un cuatrimestre seleccionado, mostrarlo
+                                        if (isWeeklyReservation && weeklyForm.semester) {
+                                          const selected = semesters.find(s => s._id === weeklyForm.semester)
+                                          return <>Cuatrimestre seleccionado: {selected?.name || 'Seleccionado'}</>
+                                        }
+                                        return <>No hay cuatrimestre activo configurado</>
+                                      })()
                                     )}
                                   </FormDescription>
                                   <FormMessage />
@@ -918,7 +973,6 @@ export default function LabReservationPage() {
                               <Button
                                 type="submit"
                                 disabled={
-                                  (availableTimeSlots.length === 0 && !!date && !slotsLoading) ||
                                   !isAuthenticated ||
                                   createReservationMutation.isPending
                                 }

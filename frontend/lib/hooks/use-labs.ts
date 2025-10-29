@@ -9,6 +9,9 @@ export const useLabs = (filters?: LabFilters) => {
     queryKey: ["labs", filters],
     queryFn: () => LabService.getLabs(filters),
     staleTime: 5 * 60 * 1000, // 5 minutos
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   })
 }
 
@@ -26,6 +29,9 @@ export const useAvailableTimeSlots = (labId: string, date: string) => {
     queryFn: () => LabService.getAvailableTimeSlots(labId, date),
     enabled: !!labId && !!date,
     staleTime: 1 * 60 * 1000, // 1 minuto
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   })
 }
 

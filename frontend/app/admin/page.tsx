@@ -25,7 +25,7 @@ export default function AdminDashboardPage() {
   return (
     <ProtectedRoute requiredRole={["Admin"]}>
       <div className="container mx-auto py-8">
-        <h1 className="text-2xl font-semibold mb-6">Panel de Administración</h1>
+        <h1 className="text-4xl font-bold mb-6 text-center bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">Panel de Administración</h1>
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>

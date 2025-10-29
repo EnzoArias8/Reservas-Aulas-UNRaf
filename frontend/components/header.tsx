@@ -37,8 +37,13 @@ export function Header() {
   const router = useRouter()
   
   // Usar el hook de autenticación
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, loadUser, logout } = useAuth()
   const isAuthenticated = !!user
+
+  // Inicializar estado de autenticación desde el token sin recargar la página
+  useEffect(() => {
+    loadUser().catch(() => {})
+  }, [])
 
   // Función para obtener iniciales del usuario (como Google)
   const getUserInitials = () => {
@@ -96,18 +101,13 @@ export function Header() {
   }
 
   const handleLogout = () => {
-    // Limpiar localStorage
-    localStorage.removeItem("currentUser")
-    localStorage.removeItem("accessToken")
-    localStorage.removeItem("refreshToken")
-    
-    toast({
-      title: "Sesión cerrada",
-      description: "Has cerrado sesión correctamente",
+    logout().finally(() => {
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión correctamente",
+      })
+      router.push("/")
     })
-    router.push("/")
-    // Recargar la página para limpiar el estado
-    window.location.reload()
   }
 
   const routes = [
@@ -123,14 +123,6 @@ export function Header() {
       icon: Calendar,
       active: pathname === "/mis-reservas",
       requiresAuth: true,
-    },
-    {
-      href: "/reservas-recurrentes",
-      label: "Reservas Recurrentes",
-      icon: Calendar,
-      active: pathname === "/reservas-recurrentes",
-      requiresAuth: true,
-      roles: ["Profesor"],
     },
     {
       href: "/perfil",
@@ -168,8 +160,8 @@ export function Header() {
                     key={route.href}
                     href={route.href}
                     className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-accent",
-                      route.active && "bg-accent",
+                      "flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                      route.active && "bg-primary/10 text-primary",
                     )}
                     onClick={() => setIsOpen(false)}
                   >
@@ -213,8 +205,8 @@ export function Header() {
               key={route.href}
               href={route.href}
               className={cn(
-                "flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary",
-                route.active ? "text-primary" : "text-muted-foreground",
+                "flex items-center gap-2 text-sm font-medium transition-colors px-3 py-2 rounded-md hover:text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                route.active ? "text-primary bg-primary/10" : "text-muted-foreground",
               )}
             >
               {route.label}
@@ -224,8 +216,8 @@ export function Header() {
             <Link
               href="/admin"
               className={cn(
-                "flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary",
-                pathname.startsWith("/admin") ? "text-primary" : "text-muted-foreground",
+                "flex items-center gap-2 text-sm font-medium transition-colors px-3 py-2 rounded-md hover:text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                pathname.startsWith("/admin") ? "text-primary bg-primary/10" : "text-muted-foreground",
               )}
             >
               Administrar
@@ -304,12 +296,12 @@ export function Header() {
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onOpenRegister={() => setIsRegisterModalOpen(true)}
-        onLoginSuccess={() => {
+        onLoginSuccess={(userData) => {
           setIsLoginModalOpen(false);
-          // Recargar la página para actualizar el estado de autenticación
+          // Forzar actualización del estado de autenticación
           setTimeout(() => {
-            window.location.reload();
-          }, 1000);
+            loadUser().catch(() => {})
+          }, 100);
         }}
       />
 
@@ -317,12 +309,10 @@ export function Header() {
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
         onOpenLogin={() => setIsLoginModalOpen(true)}
-        onRegisterSuccess={() => {
+        onRegisterSuccess={(userData) => {
           setIsRegisterModalOpen(false);
-          // Recargar la página para actualizar el estado de autenticación
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
+          // El estado se actualiza automáticamente desde el localStorage
+          // No necesitamos llamar loadUser() aquí
         }}
       />
     </header>
