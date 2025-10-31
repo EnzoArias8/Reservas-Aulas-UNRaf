@@ -31,8 +31,9 @@ export interface Reservation {
   attendees: number
   status: "confirmed" | "completed"
   createdAt: string
-  // Relaciones pobladas por el backend
+  // Relaciones populadas por el backend
   lab?: Lab
+  labId?: string | Lab // Puede ser un string o el objeto Lab completo
 }
 
 export interface TimeSlot {

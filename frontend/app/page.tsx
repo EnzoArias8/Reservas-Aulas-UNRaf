@@ -90,10 +90,6 @@ export default function LabReservationPage() {
     purpose: "",
     attendees: 1
   })
-
-  // Validación de capacidad en vivo para la reserva semanal
-  const selectedLabObj = labs.find((lab: any) => lab._id === selectedLab)
-  const weeklyCapacityExceeded = !!selectedLabObj && weeklyForm.attendees > (selectedLabObj?.capacity || Infinity)
   
   // Estados para preservar datos del formulario durante login
   const [pendingFormData, setPendingFormData] = useState<any>(null)
@@ -132,7 +128,7 @@ export default function LabReservationPage() {
       try {
         const response = await axiosClient.get("/admin/semesters")
         setSemesters(response.data?.data || response.data || [])
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading semesters:", error)
         // Si falla la autenticación, limpiar el estado
         if (error.response?.status === 401) {
@@ -206,6 +202,10 @@ export default function LabReservationPage() {
     selectedLab || "",
     date ? format(date, "yyyy-MM-dd") : "",
   )
+
+  // Validación de capacidad en vivo para la reserva semanal
+  const selectedLabObj = labs.find((lab: any) => lab._id === selectedLab)
+  const weeklyCapacityExceeded = !!selectedLabObj && weeklyForm.attendees > (selectedLabObj?.capacity || Infinity)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -309,9 +309,9 @@ export default function LabReservationPage() {
         className: "bg-green-50 border-green-200 text-green-800",
       })
 
-      // Limpiar formulario
-      form.reset()
-      setSelectedLab(null)
+      // NO limpiar selectedLab ni form aquí - se limpia en onClose de la confirmación
+      // form.reset()
+      // setSelectedLab(null)
     } catch (error: any) {
       console.error("❌ Error creating reservation:", error)
       console.error("Error details:", error.response?.data || error.message)
@@ -460,7 +460,7 @@ export default function LabReservationPage() {
                 setCreatedReservation(null)
                 form.reset()
                 setSelectedLab(null)
-                setActiveTab("reserve")
+                setActiveTab("browse")
                 setDate(new Date())
                 // Volver a la sección principal luego de cerrar la confirmación
                 setTimeout(() => {

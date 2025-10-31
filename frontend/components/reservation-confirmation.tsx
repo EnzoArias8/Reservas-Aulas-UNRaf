@@ -121,7 +121,7 @@ export function ReservationConfirmation({
         </CardContent>
         <CardFooter className="flex justify-between border-t pt-6">
           <Button variant="outline" onClick={onClose}>
-            Hacer Otra Reserva
+            Explorar Aulas
           </Button>
           <Button onClick={() => window.print()}>Imprimir Confirmación</Button>
         </CardFooter>
