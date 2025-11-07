@@ -8,6 +8,7 @@ import { useState, useEffect } from "react"
 
 interface TimeRangePickerProps {
   availableTimeSlots: string[]
+  allTimeSlots?: string[] // Todos los slots posibles (incluyendo ocupados)
   selectedTimeSlot: string
   onSelectTimeSlot: (timeSlot: string) => void
   selectedDate?: Date // Agregar fecha seleccionada para restricciones de sábado
@@ -15,6 +16,7 @@ interface TimeRangePickerProps {
 
 export function TimeRangePicker({
   availableTimeSlots,
+  allTimeSlots = [],
   selectedTimeSlot,
   onSelectTimeSlot,
   selectedDate,
@@ -66,57 +68,74 @@ export function TimeRangePicker({
       const rangeSlots = []
       for (let minutes = startMinutes; minutes < endMinutes; minutes += 15) {
         const timeString = minutesToTime(minutes)
-        const slotString = `${timeString} - ${minutesToTime(minutes + 15)}`
+        const nextTimeString = minutesToTime(minutes + 15)
+        const slotString = `${timeString} - ${nextTimeString}`
         rangeSlots.push(slotString)
       }
 
-      const allSlotsAvailable = rangeSlots.every(slot => availableTimeSlots.includes(slot))
+      // Verificar que TODOS los slots del rango estén en availableTimeSlots
+      const allSlotsAvailable = rangeSlots.length > 0 && rangeSlots.every(slot => availableTimeSlots.includes(slot))
       setIsValidRange(allSlotsAvailable)
     } else {
       setIsValidRange(false)
     }
   }, [startTime, endTime, availableTimeSlots])
 
-  // Función para verificar si un horario está disponible
+  // Función para verificar si un horario está disponible como hora de inicio
+  // Para hora de inicio: debe tener al menos un slot de 15 minutos disponible
   const isTimeAvailable = (time: string) => {
-    const isSaturday = selectedDate?.getDay() === 6
-    const timeSlots = []
-    
-    if (isSaturday) {
-      // Solo permitir horarios de 8hs a 12hs los sábados
-      for (let hour = 8; hour < 12; hour++) {
-        for (let minute = 0; minute < 60; minute += 15) {
-          const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-          const endMinute = minute + 15
-          const endHour = endMinute >= 60 ? hour + 1 : hour
-          const endMinuteAdjusted = endMinute >= 60 ? endMinute - 60 : endMinute
-          
-          if (endHour < 12) {
-            const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteAdjusted.toString().padStart(2, '0')}`
-            timeSlots.push(`${startTime} - ${endTime}`)
-          }
-        }
+    if (allTimeSlots.length > 0) {
+      // Buscar slots que empiecen con esta hora
+      const slotsStartingAtTime = allTimeSlots.filter(slot => {
+        const [slotStart] = slot.split(' - ')
+        return slotStart === time
+      })
+      
+      // Si hay slots que empiezan en esta hora, verificar si al menos uno está disponible
+      if (slotsStartingAtTime.length > 0) {
+        return slotsStartingAtTime.some(slot => availableTimeSlots.includes(slot))
       }
-    } else {
-      // Horarios normales para otros días
-      for (let hour = 8; hour <= 23; hour++) {
-        for (let minute = 0; minute < 60; minute += 15) {
-          if (hour === 23 && minute > 0) break
-          const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-          const endMinute = minute + 15
-          const endHour = endMinute >= 60 ? hour + 1 : hour
-          const endMinuteAdjusted = endMinute >= 60 ? endMinute - 60 : endMinute
-          
-          if (endHour <= 23) {
-            const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteAdjusted.toString().padStart(2, '0')}`
-            timeSlots.push(`${startTime} - ${endTime}`)
-          }
-        }
-      }
+      return false
     }
     
-    // Verificar si este horario específico está disponible
-    return availableTimeSlots.some(slot => slot.includes(time))
+    // Fallback: verificar directamente en availableSlots
+    return availableTimeSlots.some(slot => {
+      const [slotStart] = slot.split(' - ')
+      return slotStart === time
+    })
+  }
+  
+  // Función para obtener el texto del estado del horario
+  const getTimeStatus = (time: string): { isAvailable: boolean; statusText: string } => {
+    if (allTimeSlots.length > 0) {
+      // Buscar todos los slots que empiecen con esta hora
+      const slotsStartingAtTime = allTimeSlots.filter(slot => {
+        const [slotStart] = slot.split(' - ')
+        return slotStart === time
+      })
+      
+      if (slotsStartingAtTime.length === 0) {
+        return { isAvailable: false, statusText: ' (Ocupado)' }
+      }
+      
+      // Contar cuántos están disponibles
+      const availableCount = slotsStartingAtTime.filter(slot => availableTimeSlots.includes(slot)).length
+      const isAvailable = availableCount > 0
+      
+      if (!isAvailable) {
+        return { isAvailable: false, statusText: ' (Ocupado)' }
+      }
+      
+      return { isAvailable: true, statusText: '' }
+    }
+    
+    // Fallback sin allTimeSlots
+    const isAvailable = availableTimeSlots.some(slot => {
+      const [slotStart] = slot.split(' - ')
+      return slotStart === time
+    })
+    
+    return { isAvailable, statusText: isAvailable ? '' : ' (Ocupado)' }
   }
 
   const timeToMinutes = (time: string) => {
@@ -154,58 +173,68 @@ export function TimeRangePicker({
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
             Hora de Inicio
           </label>
           <select
             value={startTime}
             onChange={(e) => setStartTime(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100"
           >
             <option value="">Seleccionar hora de inicio</option>
             {timeOptions.map((time) => {
-              const isAvailable = isTimeAvailable(time)
+              const { isAvailable, statusText } = getTimeStatus(time)
               return (
                 <option 
                   key={time} 
                   value={time}
                   disabled={!isAvailable}
-                  style={{ color: isAvailable ? 'black' : 'gray' }}
+                  className={isAvailable ? "text-gray-900 dark:text-gray-100" : "text-gray-400 dark:text-gray-500"}
                 >
-                  {time} {!isAvailable ? '(Ocupado)' : ''}
+                  {time}{statusText}
                 </option>
               )
             })}
           </select>
+          {timeOptions.filter(time => !getTimeStatus(time).isAvailable).length > 0 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Los horarios marcados como "(Ocupado)" no están disponibles
+            </p>
+          )}
         </div>
 
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
             Hora de Fin
           </label>
           <select
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!startTime}
           >
             <option value="">Seleccionar hora de fin</option>
             {timeOptions
               .filter(time => !startTime || timeToMinutes(time) > timeToMinutes(startTime))
               .map((time) => {
-                const isAvailable = isTimeAvailable(time)
+                const { isAvailable, statusText } = getTimeStatus(time)
                 return (
                   <option 
                     key={time} 
                     value={time}
                     disabled={!isAvailable}
-                    style={{ color: isAvailable ? 'black' : 'gray' }}
+                    className={isAvailable ? "text-gray-900 dark:text-gray-100" : "text-gray-400 dark:text-gray-500"}
                   >
-                    {time} {!isAvailable ? '(Ocupado)' : ''}
+                    {time}{statusText}
                   </option>
                 )
               })}
           </select>
+          {!startTime && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Primero selecciona una hora de inicio
+            </p>
+          )}
         </div>
       </div>
 
@@ -246,9 +275,15 @@ export function TimeRangePicker({
             </div>
           </div>
           {!isValidRange && (
-            <p className="text-sm text-red-600 mt-2">
-              Este horario no está disponible o se superpone con reservas existentes.
-            </p>
+            <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-sm text-red-600 dark:text-red-400 font-medium flex items-center gap-2">
+                <XCircle className="h-4 w-4" />
+                Horario no disponible
+              </p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                Este rango de horario no está completamente disponible. Algunos intervalos de 15 minutos dentro de este rango ya están ocupados por otras reservas. Por favor, selecciona un horario diferente que esté completamente libre.
+              </p>
+            </div>
           )}
         </div>
       )}

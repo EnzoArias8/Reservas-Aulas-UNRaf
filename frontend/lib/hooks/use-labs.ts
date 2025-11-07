@@ -32,6 +32,10 @@ export const useAvailableTimeSlots = (labId: string, date: string) => {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
+    select: (data) => ({
+      availableSlots: data.availableSlots || [],
+      allSlots: data.allSlots || []
+    })
   })
 }
 

@@ -25,9 +25,14 @@ export class LabService {
     return response.data?.data || response.data
   }
 
-  static async getAvailableTimeSlots(labId: string, date: string): Promise<string[]> {
-    const response = await axiosClient.get<ApiResponse<string[]>>(`/labs/${labId}/available-slots?date=${date}`)
-    return response.data?.data || response.data
+  static async getAvailableTimeSlots(labId: string, date: string): Promise<{ availableSlots: string[]; allSlots: string[] }> {
+    const response = await axiosClient.get<ApiResponse<{ availableSlots: string[]; allSlots: string[] }>>(`/labs/${labId}/available-slots?date=${date}`)
+    const data = response.data?.data || response.data
+    // Si viene en formato antiguo (solo array), mantener compatibilidad
+    if (Array.isArray(data)) {
+      return { availableSlots: data, allSlots: [] }
+    }
+    return data
   }
 
   static async createLab(labData: Omit<Lab, "id" | "createdAt" | "updatedAt">): Promise<Lab> {

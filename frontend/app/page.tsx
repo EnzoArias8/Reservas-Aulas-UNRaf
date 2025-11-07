@@ -16,6 +16,7 @@ import * as z from "zod"
 import { TimeRangePicker } from "@/components/time-range-picker"
 import { LabCard } from "@/components/lab-card"
 import { ReservationConfirmation } from "@/components/reservation-confirmation"
+import { RecurringReservationConfirmation } from "@/components/recurring-reservation-confirmation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -72,10 +73,12 @@ export default function LabReservationPage() {
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [selectedLab, setSelectedLab] = useState<string | null>(null)
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const [showRecurringConfirmation, setShowRecurringConfirmation] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("browse")
   const [createdReservation, setCreatedReservation] = useState<any>(null)
+  const [createdRecurringReservation, setCreatedRecurringReservation] = useState<any>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isWeeklyReservation, setIsWeeklyReservation] = useState(false)
   const confirmationRef = useRef<HTMLDivElement | null>(null)
@@ -198,10 +201,12 @@ export default function LabReservationPage() {
   })
 
   // ✅ HOOK REAL para horarios disponibles
-  const { data: availableTimeSlots = [], isLoading: slotsLoading } = useAvailableTimeSlots(
+  const { data: timeSlotsData, isLoading: slotsLoading } = useAvailableTimeSlots(
     selectedLab || "",
     date ? format(date, "yyyy-MM-dd") : "",
   )
+  const availableTimeSlots = timeSlotsData?.availableSlots || []
+  const allTimeSlots = timeSlotsData?.allSlots || []
 
   // Validación de capacidad en vivo para la reserva semanal
   const selectedLabObj = labs.find((lab: any) => lab._id === selectedLab)
@@ -295,6 +300,7 @@ export default function LabReservationPage() {
       console.log("✅ Reservation created:", reservation)
 
       // Guardar reserva para mostrar confirmación
+      // La reserva ahora viene con labId populado desde el backend
       setCreatedReservation(reservation)
       setShowConfirmation(true)
       setActiveTab("reserve")
@@ -391,24 +397,23 @@ export default function LabReservationPage() {
         attendees: weeklyForm.attendees
       })
 
+      // Guardar la reserva creada para mostrar el comprobante
+      const reservationData = response.data?.data || response.data
+      
+      // Guardar la reserva y mostrar el comprobante (NO limpiar el formulario aún)
+      setCreatedRecurringReservation(reservationData)
+      setShowRecurringConfirmation(true)
+      
+      // Desplazar a la sección de confirmación
+      setTimeout(() => {
+        confirmationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+
       toast({
         title: "Reserva semanal creada",
         description: "Tu reserva semanal se ha creado exitosamente",
         className: "bg-green-50 border-green-200 text-green-800",
       })
-
-      // Limpiar formulario
-      setWeeklyForm({
-        dayOfWeek: 1,
-        startTime: "08:00",
-        endTime: "10:00",
-        semester: "",
-        purpose: "",
-        attendees: 1
-      })
-      setIsWeeklyReservation(false)
-      setSelectedLab(null)
-      setActiveTab("browse")
     } catch (error: any) {
       toast({
         title: "Error",
@@ -420,7 +425,7 @@ export default function LabReservationPage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <div className="container mx-auto py-10">
         <Toaster />
 
@@ -431,7 +436,7 @@ export default function LabReservationPage() {
                        flex flex-col justify-start items-center pt-6"
             style={{ backgroundImage: "url('/fondo.png')" }}
           >
-            <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent px-6 py-3">
+            <h1 className="text-5xl md:text-6xl font-bold text-[#336699] dark:text-[#4A8FCC] px-6 py-3">
               {isEditing ? 'Editar Reserva' : 'Reservas de Aulas'}
             </h1>
           </div>
@@ -446,10 +451,60 @@ export default function LabReservationPage() {
               </div>
             </div>
           </div>
+        ) : showRecurringConfirmation && createdRecurringReservation ? (
+          <div ref={confirmationRef} className="container mx-auto py-10">
+            <RecurringReservationConfirmation
+              lab={
+                createdRecurringReservation?.lab 
+                  ? ({
+                      _id: createdRecurringReservation.lab._id || createdRecurringReservation.labId || "",
+                      name: createdRecurringReservation.lab.name || "",
+                      building: createdRecurringReservation.lab.building || "",
+                      floor: createdRecurringReservation.lab.floor || "",
+                      capacity: createdRecurringReservation.lab.capacity || 0,
+                      equipment: createdRecurringReservation.lab.equipment || [],
+                      isActive: true,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString()
+                    } as any)
+                  : labs.find((lab: any) => lab._id === (createdRecurringReservation?.labId?._id || createdRecurringReservation?.labId || selectedLab))
+              }
+              dayOfWeek={createdRecurringReservation?.dayOfWeek ?? 1}
+              startTime={createdRecurringReservation?.startTime || "08:00"}
+              endTime={createdRecurringReservation?.endTime || "10:00"}
+              semester={
+                createdRecurringReservation?.semester?.name 
+                  || semesters.find(s => s._id === (createdRecurringReservation?.semester?._id || createdRecurringReservation?.semester))?.name 
+                  || "Cuatrimestre"
+              }
+              purpose={createdRecurringReservation?.purpose || ""}
+              attendees={createdRecurringReservation?.attendees ?? 1}
+              reservationId={createdRecurringReservation?._id || ""}
+              onClose={() => {
+                setShowRecurringConfirmation(false)
+                setCreatedRecurringReservation(null)
+                setWeeklyForm({
+                  dayOfWeek: 1,
+                  startTime: "08:00",
+                  endTime: "10:00",
+                  semester: "",
+                  purpose: "",
+                  attendees: 1
+                })
+                setIsWeeklyReservation(false)
+                setSelectedLab(null)
+                setActiveTab("browse")
+                // Volver a la sección principal luego de cerrar la confirmación
+                setTimeout(() => {
+                  contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }, 0)
+              }}
+            />
+          </div>
         ) : showConfirmation && createdReservation ? (
           <div ref={confirmationRef} className="container mx-auto py-10">
             <ReservationConfirmation
-              lab={labs.find((lab: any) => lab._id === selectedLab)}
+              lab={createdReservation?.labId || createdReservation?.lab || labs.find((lab: any) => lab._id === (createdReservation?.labId?._id || createdReservation?.labId || selectedLab))}
               date={date as Date}
               timeSlot={createdReservation?.timeSlot}
               purpose={createdReservation?.purpose}
@@ -473,7 +528,7 @@ export default function LabReservationPage() {
           <div ref={contentRef} className="backdrop-blur-sm bg-white/70 dark:bg-slate-800/70 rounded-2xl border border-white/20 shadow-xl mx-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <div className="flex justify-center p-6 pb-0">
-                <TabsList className="grid grid-cols-2 w-full max-w-2xl bg-gradient-to-r from-blue-100 to-purple-100 dark:from-slate-700 dark:to-slate-600">
+                <TabsList className="grid grid-cols-2 w-full max-w-2xl bg-slate-200 dark:from-slate-700 dark:to-slate-600">
                   <TabsTrigger
                     value="browse"
                     className="data-[state=active]:bg-white data-[state=active]:text-blue-600 font-medium"
@@ -484,7 +539,7 @@ export default function LabReservationPage() {
                   <TabsTrigger
                     value="reserve"
                     disabled={!selectedLab}
-                    className="data-[state=active]:bg-white data-[state=active]:text-purple-600 font-medium"
+                    className="data-[state=active]:bg-white data-[state=active]:text-[#336699] font-medium"
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Continuar Reserva
@@ -587,16 +642,16 @@ export default function LabReservationPage() {
                     
                     switch (columnIndex) {
                       case 0: // Primera columna - naranja-amarillo
-                        colorClass = "from-[#FFBF00] to-[#FFBF00]"
+                        colorClass = "bg-[#FFBF00]"
                         break
                       case 1: // Segunda columna - teal/cyan
-                        colorClass = "from-[#00AAAA] to-[#00AAAA]"
+                        colorClass = "bg-[#00AAAA]"
                         break
                       case 2: // Tercera columna - azul medio
-                        colorClass = "from-[#336699] to-[#336699]"
+                        colorClass = "bg-[#336699]"
                         break
                       default:
-                        colorClass = "from-blue-500 to-purple-500"
+                        colorClass = "bg-[#336699]"
                     }
                     
                     return (
@@ -623,8 +678,8 @@ export default function LabReservationPage() {
               </TabsContent>
 
               <TabsContent value="reserve" className="p-6">
-                <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
-                  <CardHeader className="bg-gradient-to-r from-cyan-500 to-cyan-500 text-white rounded-t-lg">
+                <Card className="border-0 shadow-xl bg-white dark:bg-slate-800">
+                  <CardHeader className="bg-[#00AAAA] text-white rounded-t-lg">
                     <CardTitle className="text-2xl flex items-center gap-2">
                       <FileText className="h-6 w-6" />
                       Reservar un Aula
@@ -637,7 +692,7 @@ export default function LabReservationPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     {!isAuthenticated && (
-                      <Alert className="mb-6 border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20">
+                      <Alert className="mb-6 border-amber-200 bg-amber-50 dark:bg-amber-900/20">
                         <AlertCircle className="h-4 w-4 text-amber-600" />
                         <AlertTitle className="text-amber-800 dark:text-amber-200">
                           Inicio de sesión requerido
@@ -669,9 +724,9 @@ export default function LabReservationPage() {
                       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                         {/* Opción de reserva semanal para profesores */}
                         {isAuthenticated && user?.role === "Profesor" && (
-                          <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
+                          <div className="bg-[#336699]/5 dark:bg-[#336699]/10 p-4 rounded-xl border border-[#336699]/20 dark:border-[#336699]/30">
                             <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-lg font-medium text-purple-800 dark:text-purple-200">
+                              <h3 className="text-lg font-medium text-[#336699] dark:text-[#4A8FCC]">
                                 Opciones de Reserva
                               </h3>
                               <div className="flex gap-2">
@@ -689,7 +744,7 @@ export default function LabReservationPage() {
                                   size="sm"
                                   onClick={() => setIsWeeklyReservation(true)}
                                 >
-                                  Reserva Semanal
+                                  Reserva Recurrente
                                 </Button>
                               </div>
                             </div>
@@ -799,7 +854,7 @@ export default function LabReservationPage() {
                                     type="button"
                                     onClick={handleWeeklyReservation}
                                     disabled={weeklyCapacityExceeded}
-                                    className="flex-1 bg-purple-600 hover:bg-purple-700"
+                                    className="flex-1 bg-[#336699] hover:bg-[#2A5580]"
                                   >
                                     Crear Reserva Semanal
                                   </Button>
@@ -819,7 +874,7 @@ export default function LabReservationPage() {
                         {!isWeeklyReservation && (
                           <>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
                             <FormField
                               control={form.control}
                               name="date"
@@ -831,9 +886,15 @@ export default function LabReservationPage() {
                                   <Calendar
                                     mode="single"
                                     selected={field.value}
-                                    onSelect={(date) => {
-                                      field.onChange(date)
-                                      setDate(date)
+                                    onSelect={(selectedDate) => {
+                                      if (selectedDate) {
+                                        // Normalizar la fecha a medianoche en la zona horaria local
+                                        // para evitar problemas de zona horaria
+                                        const normalizedDate = new Date(selectedDate)
+                                        normalizedDate.setHours(0, 0, 0, 0)
+                                        field.onChange(normalizedDate)
+                                        setDate(normalizedDate)
+                                      }
                                     }}
                                     disabled={(date) => {
                                       // Fechas pasadas
@@ -874,13 +935,13 @@ export default function LabReservationPage() {
                           </div>
 
                           <div className="space-y-6">
-                            <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
+                            <div className="bg-[#336699]/5 dark:bg-[#336699]/10 p-4 rounded-xl border border-[#336699]/20 dark:border-[#336699]/30">
                               <FormField
                                 control={form.control}
                                 name="timeSlot"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel className="text-purple-800 dark:text-purple-200 font-medium">
+                                    <FormLabel className="text-[#336699] dark:text-[#4A8FCC] font-medium">
                                       Horario
                                     </FormLabel>
                                     {slotsLoading ? (
@@ -891,6 +952,7 @@ export default function LabReservationPage() {
                                     ) : (
                                       <TimeRangePicker
                                         availableTimeSlots={availableTimeSlots}
+                                        allTimeSlots={allTimeSlots}
                                         selectedTimeSlot={field.value}
                                         onSelectTimeSlot={field.onChange}
                                         selectedDate={date}
@@ -907,7 +969,7 @@ export default function LabReservationPage() {
                               />
                             </div>
 
-                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-4 rounded-xl border border-green-200 dark:border-green-800">
+                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-800">
                               <FormField
                                 control={form.control}
                                 name="attendees"
@@ -927,7 +989,7 @@ export default function LabReservationPage() {
                                       />
                                     </FormControl>
                                     <FormDescription className="text-green-600 dark:text-green-400">
-                                      Capacidad máxima: {labs.find((lab: any) => lab._id === selectedLab)?.capacity || "N/A"}
+                                      Capacidad máxima: {labs.find((lab: any) => lab._id === selectedLab)?.capacity || "N/D"}
                                     </FormDescription>
                                     <FormMessage />
                                   </FormItem>
@@ -937,7 +999,7 @@ export default function LabReservationPage() {
                           </div>
                         </div>
 
-                        <div className="bg-gradient-to-br from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 p-4 rounded-xl border border-orange-200 dark:border-orange-800">
+                        <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-xl border border-orange-200 dark:border-orange-800">
                           <FormField
                             control={form.control}
                             name="purpose"
@@ -976,7 +1038,7 @@ export default function LabReservationPage() {
                                   !isAuthenticated ||
                                   createReservationMutation.isPending
                                 }
-                                className="bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-blue-700 text-white font-medium px-8 shadow-lg hover:shadow-xl transition-all duration-200"
+                                className="bg-[#336699] hover:bg-[#2d5a85] text-white font-medium px-8 shadow-lg hover:shadow-xl transition-all duration-200"
                               >
                                 {createReservationMutation.isPending ? (
                                   <>
@@ -1024,7 +1086,7 @@ export default function LabReservationPage() {
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
             <Button
               onClick={handleContinueToReservation}
-              className="bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-medium px-8 py-3 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300"
+              className="bg-[#FFBF00] hover:bg-[#E6A800] text-white font-medium px-8 py-3 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300"
               size="lg"
             >
               <FileText className="h-5 w-5 mr-2" />

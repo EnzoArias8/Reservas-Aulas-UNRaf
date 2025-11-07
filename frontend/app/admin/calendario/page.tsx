@@ -222,13 +222,23 @@ export default function CalendarManagementPage() {
     }
   }
 
+  // Función para traducir el tipo de feriado
+  const translateHolidayType = (type: string) => {
+    const translations: { [key: string]: string } = {
+      'national': 'Nacional',
+      'academic': 'Académico',
+      'university': 'Universitario'
+    }
+    return translations[type] || type
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <div className="container mx-auto py-10">
         <Toaster />
         
         <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold text-[#336699] dark:text-[#4A8FCC]">
             Gestión de Calendario Académico
           </h1>
           <p className="text-slate-600 dark:text-slate-300 mt-2">
@@ -529,7 +539,7 @@ export default function CalendarManagementPage() {
                       <div>
                         <h3 className="font-semibold">{holiday.name}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {format(new Date(holiday.date), "dd/MM/yyyy", { locale: es })} - {holiday.type}
+                          {format(new Date(holiday.date), "dd/MM/yyyy", { locale: es })} - {translateHolidayType(holiday.type)}
                         </p>
                         {holiday.description && (
                           <p className="text-xs text-muted-foreground mt-1">{holiday.description}</p>

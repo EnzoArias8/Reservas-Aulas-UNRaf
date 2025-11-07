@@ -21,7 +21,8 @@ router.put('/recurring/:id/toggle', protect, authorize('Profesor'), toggleRecurr
 // Rutas dinámicas deben ir al final
 router.get('/:id', protect, getReservationById);
 router.put('/:id', protect, updateReservation);
-router.put('/:id/cancel', protect, authorize('Admin'), cancelReservation);
+// Cancelación: permitir al propietario o admin (sin authorize para permitir validación en el controlador)
+router.put('/:id/cancel', protect, cancelReservation);
 router.delete('/:id', protect, authorize('Admin'), deleteReservation);
 
 // Puedes añadir más rutas y protegerlas según el rol, por ejemplo:

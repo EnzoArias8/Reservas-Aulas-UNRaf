@@ -309,11 +309,11 @@ export default function MisReservasPage() {
     return (
       <div className="container py-10">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+          <h1 className="text-4xl font-bold text-[#336699] dark:text-[#4A8FCC] mb-2">
             Mis Reservas
           </h1>
           <p className="text-muted-foreground text-lg">
-            Gestiona todas tus reservas de laboratorio en un solo lugar
+            Gestiona todas tus reservas de aulas
           </p>
         </div>
         <div className="flex justify-center items-center h-64">
@@ -334,11 +334,11 @@ export default function MisReservasPage() {
     <div className="container py-10">
       <Toaster />
       <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+        <h1 className="text-4xl font-bold text-[#336699] dark:text-[#4A8FCC] mb-2">
           Mis Reservas
         </h1>
         <p className="text-muted-foreground text-lg">
-          Gestiona todas tus reservas de laboratorio en un solo lugar
+          Gestiona todas tus reservas de aulas
         </p>
       </div>
 
@@ -359,7 +359,7 @@ export default function MisReservasPage() {
         </Card>
       ) : (
         <Tabs defaultValue="proximas" className="w-full flex flex-col items-center">
-          <TabsList className={`grid ${user?.role === "Profesor" ? "grid-cols-3" : "grid-cols-2"} mx-auto mb-8 bg-gradient-to-r from-primary/10 to-secondary/10 dark:from-slate-700 dark:to-slate-600 w-full max-w-2xl rounded-xl p-1 shadow-lg`}>
+          <TabsList className={`grid ${user?.role === "Profesor" ? "grid-cols-3" : "grid-cols-2"} mx-auto mb-8 bg-slate-200 dark:bg-slate-700 w-full max-w-2xl rounded-xl p-1 shadow-lg`}>
             <TabsTrigger value="proximas" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md font-medium rounded-lg transition-all duration-200 hover:bg-primary/20">
               <Clock className="h-4 w-4" />
               Próximas Reservas ({upcomingReservations.length})
@@ -396,8 +396,8 @@ export default function MisReservasPage() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {upcomingReservations.map((reservation: Reservation) => (
-                  <Card key={reservation._id} className="overflow-hidden border border-primary/20 dark:border-primary/30 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800">
-                    <CardHeader className="bg-gradient-to-r from-primary/5 to-secondary/5 dark:from-primary/10 dark:to-secondary/10 pb-4">
+                  <Card key={reservation._id} className="overflow-hidden border border-primary/20 dark:border-primary/30 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white dark:bg-slate-800">
+                    <CardHeader className="bg-slate-100 dark:bg-slate-700 pb-4">
                       <div className="flex justify-between items-start">
                         <div>
                           <CardTitle className="flex items-center gap-2">
@@ -407,7 +407,7 @@ export default function MisReservasPage() {
                           <CardDescription className="mt-1">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-3.5 w-3.5" />
-                              {reservation.lab?.building || 'N/A'}, {reservation.lab?.floor || 'N/A'}
+                              {reservation.lab?.building || 'N/D'}, {reservation.lab?.floor || 'N/D'}
                             </div>
                           </CardDescription>
                         </div>
@@ -441,7 +441,7 @@ export default function MisReservasPage() {
                         </div>
                       </div>
                     </CardContent>
-                    <CardFooter className="flex justify-between border-t bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 p-4">
+                    <CardFooter className="flex justify-between border-t bg-slate-50 dark:bg-slate-800 p-4">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm" className="bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg transition-all duration-200">
@@ -458,11 +458,11 @@ export default function MisReservasPage() {
                           <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
                             <div className="flex justify-between">
                               <span className="font-medium">Aula/Laboratorio:</span>
-                              <span>{reservation.lab?.name || 'N/A'}</span>
+                              <span>{reservation.lab?.name || 'N/D'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="font-medium">Edificio:</span>
-                              <span>{reservation.lab?.building || 'N/A'}</span>
+                              <span>{reservation.lab?.building || 'N/D'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="font-medium">Fecha:</span>
@@ -545,7 +545,7 @@ export default function MisReservasPage() {
                           <CardDescription className="mt-1">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-3.5 w-3.5" />
-                              {reservation.lab?.building || 'N/A'}, {reservation.lab?.floor || 'N/A'}
+                              {reservation.lab?.building || 'N/D'}, {reservation.lab?.floor || 'N/D'}
                             </div>
                           </CardDescription>
                         </div>
@@ -592,10 +592,9 @@ export default function MisReservasPage() {
               <div className="max-w-7xl mx-auto">
                 <div className="flex justify-between items-center mb-8">
                   <div>
-                    <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                      Reservas Recurrentes
-                    </h2>
-                    <p className="text-muted-foreground mt-1">Programa tus clases regulares por cuatrimestre</p>
+                    <h2 className="text-3xl font-bold text-[#336699] dark:text-[#4A8FCC]">
+                                          </h2>
+                    <p className="text-muted-foreground mt-1"></p>
                   </div>
                 </div>
 
@@ -607,15 +606,15 @@ export default function MisReservasPage() {
                       </div>
                       <h3 className="text-xl font-medium mb-2">No tienes reservas recurrentes</h3>
                       <p className="text-muted-foreground text-center mb-6">
-                        Programa tus clases regulares por cuatrimestre
+                  
                       </p>
                     </CardContent>
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {recurringReservations.map((reservation) => (
-                      <Card key={reservation._id} className="hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800 border border-accent/20 dark:border-accent/30">
-                        <CardHeader className="bg-gradient-to-r from-accent/5 to-primary/5 dark:from-accent/10 dark:to-primary/10">
+                      <Card key={reservation._id} className="hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white dark:bg-slate-800 border border-accent/20 dark:border-accent/30">
+                        <CardHeader className="bg-slate-100 dark:bg-slate-700">
                           <div className="flex justify-between items-start">
                             <CardTitle className="text-lg text-accent font-semibold">{reservation.lab?.name || reservation.labName}</CardTitle>
                             <Badge variant={reservation.isActive ? "default" : "secondary"} className={reservation.isActive ? "bg-accent text-white shadow-md" : ""}>
@@ -637,7 +636,7 @@ export default function MisReservasPage() {
                           </div>
                           <div className="flex items-center gap-2 text-sm">
                             <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <span>{reservation.lab?.building || labs.find(l => l._id === reservation.labId)?.building || 'N/A'}</span>
+                            <span>{reservation.lab?.building || labs.find(l => l._id === reservation.labId)?.building || 'N/D'}</span>
                           </div>
                           <div className="flex items-center gap-2 text-sm">
                             <Users className="h-4 w-4 text-muted-foreground" />
@@ -687,9 +686,9 @@ export default function MisReservasPage() {
 
                 {/* Formulario de Nueva Reserva Recurrente */}
                 {showRecurringForm && (
-                  <Card className="max-w-2xl mx-auto mt-8 border border-primary/20 dark:border-primary/30 shadow-xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800">
-                    <CardHeader className="bg-gradient-to-r from-primary/5 to-secondary/5 dark:from-primary/10 dark:to-secondary/10">
-                      <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                  <Card className="max-w-2xl mx-auto mt-8 border border-primary/20 dark:border-primary/30 shadow-xl bg-white dark:bg-slate-800">
+                    <CardHeader className="bg-slate-100 dark:bg-slate-700">
+                      <CardTitle className="text-2xl font-bold text-[#336699] dark:text-[#4A8FCC]">
                         Nueva Reserva Recurrente
                       </CardTitle>
                       <CardDescription className="text-base">

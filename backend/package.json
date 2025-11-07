@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {
-    "dev": "nodemon",
+    "dev": "node --max-old-space-size=4096 node_modules/nodemon/bin/nodemon.js",
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "node --loader ts-node/esm src/scripts/seed.ts",

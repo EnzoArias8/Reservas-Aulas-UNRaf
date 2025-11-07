@@ -246,6 +246,16 @@ export function CalendarAdmin() {
     }
   }
 
+  // Función para traducir el tipo de feriado
+  const translateHolidayType = (type: string) => {
+    const translations: { [key: string]: string } = {
+      'national': 'Nacional',
+      'academic': 'Académico',
+      'university': 'Universitario'
+    }
+    return translations[type] || type
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -538,7 +548,7 @@ export function CalendarAdmin() {
                       <div>
                         <h3 className="font-semibold">{holiday.name}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {safeFormatDate(holiday.date)} - {holiday.type}
+                          {safeFormatDate(holiday.date)} - {translateHolidayType(holiday.type)}
                         </p>
                         {holiday.description && (
                           <p className="text-xs text-muted-foreground mt-1">{holiday.description}</p>

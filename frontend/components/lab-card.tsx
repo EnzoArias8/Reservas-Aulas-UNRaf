@@ -28,7 +28,7 @@ export function LabCard({ lab, onSelect, isSelected }: LabCardProps) {
         isSelected ? "ring-2 ring-blue-500 shadow-xl scale-105" : "hover:shadow-lg"
       } bg-white dark:bg-slate-800 border-0 shadow-md`}
     >
-      <CardHeader className={`bg-gradient-to-r ${lab.color || "from-blue-500 to-purple-500"} text-white pb-4`}>
+      <CardHeader className={`${lab.color || "bg-[#336699]"} text-white pb-4`}>
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -60,12 +60,12 @@ export function LabCard({ lab, onSelect, isSelected }: LabCardProps) {
               variant="outline"
               className={`text-xs transition-colors hover:bg-slate-100 dark:hover:bg-slate-700 ${
                 index % 4 === 0
-                  ? "border-blue-300 text-blue-700 dark:text-blue-400"
+                  ? "border-[#336699] text-[#336699] dark:text-[#4A8FCC]"
                   : index % 4 === 1
-                    ? "border-purple-300 text-purple-700 dark:text-purple-400"
+                    ? "border-[#00AAAA] text-[#00AAAA] dark:text-[#33CCCC]"
                     : index % 4 === 2
-                      ? "border-green-300 text-green-700 dark:text-green-400"
-                      : "border-orange-300 text-orange-700 dark:text-orange-400"
+                      ? "border-[#FFBF00] text-[#FFBF00] dark:text-[#FFD700]"
+                      : "border-[#336699]/70 text-[#336699] dark:text-[#4A8FCC]"
               }`}
             >
               {item}
@@ -73,13 +73,13 @@ export function LabCard({ lab, onSelect, isSelected }: LabCardProps) {
           ))}
         </div>
       </CardContent>
-      <CardFooter className="flex justify-end border-t bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-600 p-3">
+      <CardFooter className="flex justify-end border-t bg-slate-50 dark:bg-slate-700 p-3">
         <Button
           onClick={onSelect}
           variant={isSelected ? "default" : "outline"}
           className={
             isSelected
-              ? "bg-gradient-to-r from-yellow-600 to-yellow-600 hover:from-yellow-700 hover:to-yellow-700 text-white shadow-md"
+              ? "bg-[#FFBF00] hover:bg-[#E6A800] text-white shadow-md"
               : "border-slate-300 hover:bg-slate-50 dark:border-slate-500 dark:hover:bg-slate-700"
           }
         >

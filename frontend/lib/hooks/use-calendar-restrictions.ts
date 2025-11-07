@@ -82,7 +82,11 @@ export function useCalendarRestrictions() {
   // Verificar si una fecha es feriado
   const isHoliday = (date: Date): boolean => {
     const dateStr = date.toISOString().split('T')[0]
-    return restrictions.holidays.some(holiday => holiday.date === dateStr)
+    return restrictions.holidays.some(holiday => {
+      // Normalizar la fecha del feriado a solo fecha (sin hora)
+      const holidayDateStr = holiday.date.split('T')[0]
+      return holidayDateStr === dateStr
+    })
   }
 
   // Verificar si una fecha está en semana de examen
@@ -98,8 +102,8 @@ export function useCalendarRestrictions() {
     // No permitir reservas en feriados
     if (isHoliday(date)) return false
     
-    // No permitir reservas en semanas de examen
-    if (isExamWeek(date)) return false
+    // Las semanas de examen SÍ permiten reservas (solo bloquean reservas recurrentes)
+    // if (isExamWeek(date)) return false  // COMENTADO: Las semanas de examen permiten reservas normales
     
     // Solo permitir reservas en cuatrimestres activos
     if (!isDateInActiveSemester(date)) return false
@@ -117,7 +121,10 @@ export function useCalendarRestrictions() {
     const dateStr = date.toISOString().split('T')[0]
     
     if (isHoliday(date)) {
-      const holiday = restrictions.holidays.find(h => h.date === dateStr)
+      const holiday = restrictions.holidays.find(h => {
+        const holidayDateStr = h.date.split('T')[0]
+        return holidayDateStr === dateStr
+      })
       return {
         isRestricted: true,
         reason: 'Feriado',
@@ -125,16 +132,17 @@ export function useCalendarRestrictions() {
       }
     }
     
-    if (isExamWeek(date)) {
-      const examWeek = restrictions.examWeeks.find(ew => 
-        dateStr >= ew.startDate && dateStr <= ew.endDate
-      )
-      return {
-        isRestricted: true,
-        reason: 'Semana de Examen',
-        message: examWeek?.name || 'Mesas de examen'
-      }
-    }
+    // Las semanas de examen ya no bloquean reservas, solo bloquean reservas recurrentes
+    // if (isExamWeek(date)) {
+    //   const examWeek = restrictions.examWeeks.find(ew => 
+    //     dateStr >= ew.startDate && dateStr <= ew.endDate
+    //   )
+    //   return {
+    //     isRestricted: true,
+    //     reason: 'Semana de Examen',
+    //     message: examWeek?.name || 'Mesas de examen'
+    //   }
+    // }
     
     if (!isDateInActiveSemester(date)) {
       return {

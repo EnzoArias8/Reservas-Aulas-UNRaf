@@ -111,7 +111,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       toast({
         title: "Registro exitoso",
         description: "Tu cuenta necesita ser activada por un administrador",
-        className: "bg-blue-50 border-blue-200 text-blue-800",
+        className: "bg-[#336699]/10 border-[#336699]/30 text-[#336699]",
       })
 
       // No llamar callback - el usuario no está logueado automáticamente
@@ -139,7 +139,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <DialogTitle className="text-2xl font-bold text-[#336699] dark:text-[#4A8FCC]">
             Crear Cuenta
           </DialogTitle>
           <DialogDescription>Completa el formulario para crear una cuenta.</DialogDescription>
@@ -263,7 +263,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             <Button 
               type="submit" 
               disabled={isLoading} 
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700"
+              className="bg-[#336699] text-white hover:bg-[#2A5580]"
             >
               {isLoading ? (
                 <>

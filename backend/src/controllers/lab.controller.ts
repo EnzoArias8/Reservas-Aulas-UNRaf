@@ -2,6 +2,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { Lab } from '../models/Lab.model';
 import { Reservation } from '../models/Reservation.model';
+import { RecurringReservation } from '../models/RecurringReservation.model';
+import { Semester } from '../models/Semester.model';
+import { Holiday } from '../models/Holiday.model';
+import { ExamWeek } from '../models/ExamWeek.model';
 import { AppError } from '../utils/AppError';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -158,53 +162,149 @@ export const getAvailableTimeSlots = async (
       throw new AppError('Laboratorio no encontrado', 404);
     }
 
-    // Generar horarios de 15 minutos desde las 08:00 hasta las 23:00
+    // Normalizar fecha para comparaciones
+    // Función auxiliar para parsear fecha string y obtener el día de la semana
+    // Evita problemas de zona horaria parseando manualmente la fecha
+    function getDayOfWeekFromDateString(dateString: string): number {
+      const dateParts = dateString.split('-');
+      if (dateParts.length !== 3) {
+        throw new Error('Formato de fecha inválido. Debe ser YYYY-MM-DD');
+      }
+      const year = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10) - 1; // Los meses en JavaScript son 0-indexados
+      const day = parseInt(dateParts[2], 10);
+      
+      // Crear una fecha en la zona horaria local para obtener el día correcto
+      const date = new Date(year, month, day);
+      return date.getDay();
+    }
+    
+    const dt = new Date(String(date));
+    let dow: number;
+    try {
+      dow = getDayOfWeekFromDateString(String(date));
+    } catch (error: any) {
+      throw new AppError(error.message || 'Formato de fecha inválido', 400);
+    }
+
+    // Domingos: no hay horarios disponibles
+    if (dow === 0) {
+      return res.status(200).json({ 
+        success: true, 
+        data: { availableSlots: [], allSlots: [] } 
+      });
+    }
+
+    // Verificar si es feriado: no hay horarios disponibles
+    const normalizedDate = new Date(dt);
+    normalizedDate.setUTCHours(0, 0, 0, 0);
+    const nextDay = new Date(normalizedDate);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    
+    const holiday = await Holiday.findOne({
+      date: {
+        $gte: normalizedDate,
+        $lt: nextDay
+      }
+    });
+    
+    if (holiday) {
+      return res.status(200).json({ 
+        success: true, 
+        data: { availableSlots: [], allSlots: [] } 
+      });
+    }
+
+    // Generar horarios posibles según el día de la semana
     const allTimeSlots = [];
-    for (let hour = 8; hour <= 23; hour++) {
+    const startHour = 8;
+    const endHourExclusive = dow === 6 ? 12 : 23; // Sábado hasta 12:00, otros días hasta 23:00
+
+    for (let hour = startHour; hour < endHourExclusive; hour++) {
       for (let minute = 0; minute < 60; minute += 15) {
-        if (hour === 23 && minute > 0) break; // No pasar de las 23:00
         const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        const endMinute = minute + 15;
-        const endHour = endMinute >= 60 ? hour + 1 : hour;
-        const endMinuteAdjusted = endMinute >= 60 ? endMinute - 60 : endMinute;
-        
-        if (endHour <= 23) {
-          const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteAdjusted.toString().padStart(2, '0')}`;
-          allTimeSlots.push(`${startTime} - ${endTime}`);
+        const endHour = minute === 45 ? hour + 1 : hour;
+        const endMinute = minute === 45 ? 0 : minute + 15;
+        const endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+
+        // En sábado, asegurarse de que el fin no exceda 12:00
+        if (dow === 6 && (endHour > 12 || (endHour === 12 && endMinute > 0))) {
+          continue;
         }
+
+        allTimeSlots.push(`${startTime} - ${endTime}`);
       }
     }
 
-    // Buscar reservas para ese laboratorio y fecha
-    const reservations = await Reservation.find({
+    // Obtener reservas existentes para este laboratorio en esta fecha
+    const existingReservations = await Reservation.find({
       labId: id,
-      date: new Date(date as string),
-      status: { $in: ['pending', 'confirmed'] }
+      date: date,
+      status: { $in: ['confirmed'] }
     });
 
-    // Función para verificar si un slot se superpone con reservas existentes
-    const isSlotAvailable = (slot: string) => {
-      const [startTime, endTime] = slot.split(' - ');
+    // Obtener reservas recurrentes que apliquen para este día
+    // IMPORTANTE: Las reservas recurrentes NO se aplican durante semanas de examen
+    const normalizedRecDate = new Date(dt);
+    normalizedRecDate.setUTCHours(0, 0, 0, 0);
+    const nextRecDay = new Date(normalizedRecDate);
+    nextRecDay.setUTCDate(nextRecDay.getUTCDate() + 1);
+    
+    const isInExamWeek = await ExamWeek.findOne({
+      startDate: { $lte: nextRecDay },
+      endDate: { $gte: normalizedRecDate }
+    });
+
+    let recurring = [];
+    // Solo obtener reservas recurrentes si NO estamos en una semana de examen
+    if (!isInExamWeek) {
+      const active = await Semester.find({ isActive: true });
+      const activeIds = active
+        .filter(s => {
+          const d = new Date(dt.toISOString().split('T')[0]);
+          const start = new Date(new Date(s.startDate).toISOString().split('T')[0]);
+          const end = new Date(new Date(s.endDate).toISOString().split('T')[0]);
+          return d >= start && d <= end;
+        })
+        .map(s => s._id);
+      recurring = await RecurringReservation.find({ labId: id, dayOfWeek: dow, semester: { $in: activeIds }, isActive: true });
+    }
+
+    // Función para verificar si un slot está disponible
+    const isSlotAvailable = (timeSlot: string) => {
+      const [startTime, endTime] = timeSlot.split(' - ');
       const [startHour, startMinute] = startTime.split(':').map(Number);
       const [endHour, endMinute] = endTime.split(':').map(Number);
       
       const startMinutes = startHour * 60 + startMinute;
       const endMinutes = endHour * 60 + endMinute;
 
-      // Verificar si este slot se superpone con alguna reserva existente
-      for (const reservation of reservations) {
-        const [existingStart, existingEnd] = reservation.timeSlot.split(' - ');
-        const [existingStartHour, existingStartMinute] = existingStart.split(':').map(Number);
-        const [existingEndHour, existingEndMinute] = existingEnd.split(':').map(Number);
+      // Verificar si se superpone con alguna reserva existente
+      for (const reservation of existingReservations) {
+        const [existingStartTime, existingEndTime] = reservation.timeSlot.split(' - ');
+        const [existingStartHour, existingStartMinute] = existingStartTime.split(':').map(Number);
+        const [existingEndHour, existingEndMinute] = existingEndTime.split(':').map(Number);
         
         const existingStartMinutes = existingStartHour * 60 + existingStartMinute;
         const existingEndMinutes = existingEndHour * 60 + existingEndMinute;
 
-        // Verificar superposición: si hay intersección, el slot no está disponible
-        if (!(endMinutes <= existingStartMinutes || startMinutes >= existingEndMinutes)) {
+        // Si hay superposición, el slot no está disponible
+        if (startMinutes < existingEndMinutes && endMinutes > existingStartMinutes) {
           return false;
         }
       }
+      
+      // Verificar con reservas recurrentes también
+      for (const r of recurring) {
+        const [rStartH, rStartM] = r.startTime.split(':').map(Number);
+        const [rEndH, rEndM] = r.endTime.split(':').map(Number);
+        const recStart = rStartH * 60 + rStartM;
+        const recEnd = rEndH * 60 + rEndM;
+        if (startMinutes < recEnd && endMinutes > recStart) {
+          return false;
+        }
+      }
+      
       return true;
     };
 
@@ -214,7 +314,10 @@ export const getAvailableTimeSlots = async (
     res.status(200).json({
       success: true,
       message: 'Horarios disponibles obtenidos exitosamente',
-      data: availableSlots
+      data: {
+        availableSlots,
+        allSlots: allTimeSlots
+      }
     });
   } catch (error) {
     next(error);

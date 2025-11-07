@@ -136,7 +136,7 @@ export function LoginModal({ isOpen, onClose, onOpenRegister, onLoginSuccess }: 
         toast({
           title: "Cuenta pendiente de activación",
           description: "Tu cuenta necesita ser activada, por favor comunícate con un administrador.",
-          className: "bg-blue-50 border-blue-200 text-blue-800",
+          className: "bg-[#336699]/10 border-[#336699]/30 text-[#336699]",
         })
       } else {
         setError(errorMessage)
@@ -162,7 +162,7 @@ export function LoginModal({ isOpen, onClose, onOpenRegister, onLoginSuccess }: 
     }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <DialogTitle className="text-2xl font-bold text-[#336699] dark:text-[#4A8FCC]">
             Iniciar Sesión
           </DialogTitle>
           <DialogDescription>Ingresa tus credenciales para acceder al sistema de reservas.</DialogDescription>

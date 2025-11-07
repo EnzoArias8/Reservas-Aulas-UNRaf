@@ -25,7 +25,7 @@ export default function AdminDashboardPage() {
   return (
     <ProtectedRoute requiredRole={["Admin"]}>
       <div className="container mx-auto py-8">
-        <h1 className="text-4xl font-bold mb-6 text-center bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">Panel de Administración</h1>
+        <h1 className="text-4xl font-bold mb-6 text-center text-[#336699] dark:text-[#4A8FCC]">Panel de Administración</h1>
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
@@ -410,24 +410,24 @@ function ReservationsAdmin() {
               <tbody>
                 {filtered.map((r: any) => (
                   <tr key={r._id} className="border-b">
-                    <td className="py-2">{r.date ? new Date(r.date).toLocaleDateString() : 'N/A'}</td>
-                    <td>{r.timeSlot || 'N/A'}</td>
+                    <td className="py-2">{r.date ? new Date(r.date).toLocaleDateString() : 'N/D'}</td>
+                    <td>{r.timeSlot || 'N/D'}</td>
                     <td>
                       {r.labId && typeof r.labId === 'object' && r.labId.name ? 
                         r.labId.name : 
-                        (typeof r.labId === 'string' ? r.labId : 'N/A')
+                        (typeof r.labId === 'string' ? r.labId : 'N/D')
                       }
                     </td>
                     <td>
                       {r.labId && typeof r.labId === 'object' ? 
-                        r.labId.building || 'N/A' :
-                        'N/A'
+                        r.labId.building || 'N/D' :
+                        'N/D'
                       }
                     </td>
                     <td>
                       {r.userId && typeof r.userId === 'object' ? 
-                        r.userId.email || 'N/A' :
-                        'N/A'
+                        r.userId.email || 'N/D' :
+                        'N/D'
                       }
                     </td>
                     <td>{r.attendees || 0}</td>
@@ -464,11 +464,11 @@ function ReservationsAdmin() {
                               <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
                                 <div className="flex justify-between">
                                   <span className="font-medium">Aula/Laboratorio:</span>
-                                  <span>{r.labId?.name || 'N/A'}</span>
+                                  <span>{r.labId?.name || 'N/D'}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="font-medium">Edificio:</span>
-                                  <span>{r.labId?.building || 'N/A'}</span>
+                                  <span>{r.labId?.building || 'N/D'}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="font-medium">Fecha:</span>
@@ -484,7 +484,7 @@ function ReservationsAdmin() {
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="font-medium">Usuario:</span>
-                                  <span>{r.userId && typeof r.userId === 'object' ? r.userId.email || 'N/A' : 'N/A'}</span>
+                                  <span>{r.userId && typeof r.userId === 'object' ? r.userId.email || 'N/D' : 'N/D'}</span>
                                 </div>
                                 {r.purpose && (
                                   <div className="flex justify-between">
@@ -521,11 +521,11 @@ function ReservationsAdmin() {
                               <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
                                 <div className="flex justify-between">
                                   <span className="font-medium">Aula/Laboratorio:</span>
-                                  <span>{r.labId?.name || 'N/A'}</span>
+                                  <span>{r.labId?.name || 'N/D'}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="font-medium">Edificio:</span>
-                                  <span>{r.labId?.building || 'N/A'}</span>
+                                  <span>{r.labId?.building || 'N/D'}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="font-medium">Fecha:</span>
@@ -541,7 +541,7 @@ function ReservationsAdmin() {
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="font-medium">Usuario:</span>
-                                  <span>{r.userId && typeof r.userId === 'object' ? r.userId.email || 'N/A' : 'N/A'}</span>
+                                  <span>{r.userId && typeof r.userId === 'object' ? r.userId.email || 'N/D' : 'N/D'}</span>
                                 </div>
                                 {r.purpose && (
                                   <div className="flex justify-between">
@@ -745,7 +745,7 @@ function UsersAdmin() {
                     <td className="py-2">{u.nombre}</td>
                     <td>{u.apellido}</td>
                     <td>{u.email}</td>
-                    <td>{u.telefono || 'N/A'}</td>
+                    <td>{u.telefono || 'N/D'}</td>
                     <td>
                       <select 
                         value={u.role} 

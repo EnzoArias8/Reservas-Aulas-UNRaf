@@ -63,6 +63,7 @@ export default function PerfilPage() {
     confirmPassword: ""
   })
   const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   // Función para obtener iniciales del usuario (como Google)
@@ -102,7 +103,7 @@ export default function PerfilPage() {
   const getAvatarColor = () => {
     if (!userData) {
       console.log("🔍 No userData for color, using default")
-      return "bg-gradient-to-br from-[#FFBF00] to-[#FFBF00]"
+      return "bg-[#FFBF00]"
     }
     
     const initials = getUserInitials()
@@ -110,9 +111,9 @@ export default function PerfilPage() {
     
     // Usar los 3 colores de las aulas: naranja, teal, azul
     const colors = [
-      "bg-gradient-to-br from-[#FFBF00] to-[#FFBF00]", // Naranja-amarillo
-      "bg-gradient-to-br from-[#00AAAA] to-[#00AAAA]", // Teal/cyan
-      "bg-gradient-to-br from-[#336699] to-[#336699]"  // Azul medio
+      "bg-[#FFBF00]", // Naranja-amarillo
+      "bg-[#00AAAA]", // Teal/cyan
+      "bg-[#336699]"  // Azul medio
     ]
     
     const selectedColor = colors[hash % colors.length]
@@ -123,6 +124,7 @@ export default function PerfilPage() {
   // Cargar datos del usuario
   useEffect(() => {
     const loadUserData = async () => {
+      setIsLoading(true)
       try {
         // Cargar datos actualizados desde el backend
         const user = await AuthService.getCurrentUser()
@@ -144,6 +146,8 @@ export default function PerfilPage() {
             console.error("Error parsing stored user data:", parseError)
           }
         }
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -284,10 +288,27 @@ export default function PerfilPage() {
     router.push("/")
   }
 
+  // Mostrar carga mientras se verifica el usuario
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+        <div className="container py-10">
+          <Toaster />
+          <Card className="border-0 shadow-xl bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
+            <CardContent className="flex flex-col items-center justify-center py-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+              <p className="text-muted-foreground text-center">Cargando perfil...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   // Si no hay usuario, mostrar mensaje
   if (!userData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-primary/5 to-secondary/5 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
         <div className="container py-10">
           <Toaster />
           <Card className="border-0 shadow-xl bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
@@ -315,7 +336,7 @@ export default function PerfilPage() {
       <div className="container py-10">
         <Toaster />
         <div className="mb-6 text-center">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold text-[#336699] dark:text-[#4A8FCC]">
             Mi Perfil
           </h1>
           <p className="text-slate-600 dark:text-slate-300 mt-2">Gestiona tu información personal y configuración</p>
@@ -341,7 +362,7 @@ export default function PerfilPage() {
                   <div className="flex items-center gap-2">
                     <Badge
                       variant="outline"
-                      className="px-3 py-1 bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20 text-primary dark:from-primary/20 dark:to-secondary/20 dark:border-primary/30 dark:text-primary"
+                      className="px-3 py-1 bg-[#336699]/10 dark:bg-[#336699]/30 border-[#336699]/30 dark:border-[#336699]/50 text-[#336699] dark:text-[#4A8FCC]"
                     >
                       <Shield className="h-3.5 w-3.5 mr-1" />
                       {userData.role || "Usuario"}
@@ -419,7 +440,7 @@ export default function PerfilPage() {
           <div className="md:col-span-2">
             <div className="backdrop-blur-sm bg-white/70 dark:bg-slate-800/70 rounded-2xl border border-white/20 shadow-xl">
               <Tabs defaultValue="informacion" className="w-full flex flex-col items-center">
-                <TabsList className="grid grid-cols-2 mx-auto mt-6 mb-0 bg-gradient-to-r from-primary/10 to-secondary/10 dark:from-slate-700 dark:to-slate-600 w-full max-w-md">
+                <TabsList className="grid grid-cols-2 mx-auto mt-6 mb-0 bg-slate-200 dark:bg-slate-700 w-full max-w-md">
                   <TabsTrigger
                     value="informacion"
                     className="data-[state=active]:bg-white data-[state=active]:text-primary font-medium"
@@ -438,7 +459,7 @@ export default function PerfilPage() {
 
                 <TabsContent value="informacion" className="w-full px-6">
                   <div className="max-w-4xl mx-auto">
-                    <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+                    <Card className="border-0 shadow-lg bg-white dark:bg-slate-800">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <User className="h-5 w-5 text-blue-600" />
@@ -539,10 +560,10 @@ export default function PerfilPage() {
 
                 <TabsContent value="seguridad" className="w-full px-6">
                   <div className="max-w-4xl mx-auto">
-                    <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+                    <Card className="border-0 shadow-lg bg-white dark:bg-slate-800">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
-                        <Lock className="h-5 w-5 text-purple-600" />
+                        <Lock className="h-5 w-5 text-[#336699]" />
                         Seguridad
                       </CardTitle>
                       <CardDescription>Administra tu contraseña y la seguridad de tu cuenta.</CardDescription>

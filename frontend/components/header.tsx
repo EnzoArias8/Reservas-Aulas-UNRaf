@@ -82,7 +82,7 @@ export function Header() {
   const getAvatarColor = () => {
     if (!user) {
       console.log("🔍 No user for color, using default")
-      return "bg-gradient-to-br from-[#FFBF00] to-[#FFBF00]"
+      return "bg-[#FFBF00]"
     }
     
     const initials = getUserInitials()
@@ -90,9 +90,9 @@ export function Header() {
     
     // Usar los 3 colores de las aulas: naranja, teal, azul (igual que el perfil)
     const colors = [
-      "bg-gradient-to-br from-[#FFBF00] to-[#FFBF00]", // Naranja-amarillo (color UNRaf)
-      "bg-gradient-to-br from-[#00AAAA] to-[#00AAAA]", // Teal/cyan
-      "bg-gradient-to-br from-[#336699] to-[#336699]"  // Azul medio
+      "bg-[#FFBF00]", // Naranja-amarillo (color UNRaf)
+      "bg-[#00AAAA]", // Teal/cyan
+      "bg-[#336699]"  // Azul medio
     ]
     
     const selectedColor = colors[hash % colors.length]
