@@ -2,8 +2,8 @@
 
 import axios from 'axios';
 
-// URL base del backend
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+// URL base del backend - Configuración dinámica para local y producción
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '/_/backend' : 'http://localhost:3001/api');
 
 // Clase para errores de API personalizados
 export class ApiError extends Error {
