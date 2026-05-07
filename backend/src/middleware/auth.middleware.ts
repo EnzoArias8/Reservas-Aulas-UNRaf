@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/AppError';
 import jwt from 'jsonwebtoken';
-import { User, IUser } from '../models/User.model';
+import prisma from '../utils/prisma';
 
 // Extender la interfaz Request para incluir la propiedad 'user'
 export interface AuthRequest extends Request {
-  user?: { id: string; role: IUser['role'] };
+  user?: { id: string; role: 'Profesor' | 'Investigador' | 'Admin' };
 }
 
 export const protect = async (req: Request, res: Response, next: NextFunction) => {
@@ -21,7 +21,13 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: string };
 
-    const currentUser = await User.findById(decoded.id);
+    const currentUser = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        role: true
+      }
+    });
     if (!currentUser) {
       return next(new AppError('El usuario perteneciente a este token ya no existe.', 401));
     }
@@ -33,7 +39,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
   }
 };
 
-export const authorize = (...roles: IUser['role'][]) => {
+export const authorize = (...roles: ('Profesor' | 'Investigador' | 'Admin')[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user || !roles.includes(req.user.role)) {
       return next(new AppError('No tienes permiso para realizar esta acción.', 403));

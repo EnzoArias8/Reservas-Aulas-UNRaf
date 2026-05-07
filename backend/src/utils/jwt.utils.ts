@@ -3,7 +3,6 @@
 // ============================================
 import { Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/User.model';
 
 export const generateAccessToken = (userId: string): string => {
   const secret = process.env.JWT_SECRET;
@@ -26,13 +25,13 @@ export const generateRefreshToken = (userId: string): string => {
 };
 
 export const sendTokenResponse = (
-  user: InstanceType<typeof User> & { _id: string },
+  user: { id: string },
   statusCode: number,
   res: Response,
   refreshToken?: string
 ): void => {
-  const accessToken = generateAccessToken(user._id.toString());
-  const finalRefreshToken = refreshToken || generateRefreshToken(user._id.toString());
+  const accessToken = generateAccessToken(user.id);
+  const finalRefreshToken = refreshToken || generateRefreshToken(user.id);
 
   const cookieExpireDays = Number(process.env.COOKIE_EXPIRE) || 7;
 

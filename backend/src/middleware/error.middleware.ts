@@ -16,24 +16,22 @@ export const errorHandler = (
     console.error('Error completo:', err);
   }
 
-  // Error de Mongoose - ID inválido
-  if (err.name === 'CastError') {
+  // Error de Prisma - Registro no encontrado
+  if (err.code === 'P2025') {
     const message = 'Recurso no encontrado';
     error = new AppError(message, 404);
   }
 
-  // Error de Mongoose - Duplicado
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyValue)[0];
+  // Error de Prisma - Duplicado
+  if (err.code === 'P2002') {
+    const field = err.meta?.target?.[0] || 'registro';
     const message = `Ya existe un registro con ese ${field}`;
     error = new AppError(message, 400);
   }
 
-  // Error de validación de Mongoose
-  if (err.name === 'ValidationError') {
-    const message = Object.values(err.errors)
-      .map((val: any) => val.message)
-      .join(', ');
+  // Error de validación de Prisma
+  if (err.code === 'P2003') {
+    const message = 'Error de validación de datos';
     error = new AppError(message, 400);
   }
 

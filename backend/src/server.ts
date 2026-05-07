@@ -10,7 +10,7 @@ import reservationRouter from './routes/reservation.routes';
 import userRouter from './routes/user.routes';
 import calendarRouter from './routes/calendar.routes';
 import { errorHandler } from './middleware/error.middleware';
-import { connectDB } from './config/database';
+import prisma from './utils/prisma';
 
 dotenv.config();
 
@@ -62,8 +62,8 @@ app.use(errorHandler);
 // Iniciar servidor
 const startServer = async () => {
   try {
-    // Conectar a la base de datos
-    await connectDB();
+    // Conectar a la base de datos Prisma
+    await prisma.$connect();
     
     app.listen(PORT, () => {
       console.log(`🚀 Servidor corriendo en puerto ${PORT}`);

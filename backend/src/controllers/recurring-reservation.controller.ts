@@ -1,15 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
-import { RecurringReservation } from '../models/RecurringReservation.model';
-import { Lab } from '../models/Lab.model';
-import { Semester } from '../models/Semester.model';
+import prisma from '../utils/prisma';
 import { AppError } from '../utils/AppError';
+import { AuthRequest } from '../middleware/auth.middleware';
 
 // ============================================
 // RECURRING RESERVATIONS
 // ============================================
 
 // Obtener todas las reservas recurrentes del usuario autenticado
-export const getMyRecurringReservations = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const getMyRecurringReservations = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?.id;
     
@@ -17,10 +16,26 @@ export const getMyRecurringReservations = async (req: Request, res: Response, ne
       throw new AppError('Usuario no autenticado', 401);
     }
 
-    const reservations = await RecurringReservation.find({ userId })
-      .populate('lab', 'name building floor')
-      .populate('semester', 'name startDate endDate')
-      .sort({ createdAt: -1 });
+    const reservations = await prisma.recurringReservation.findMany({
+      where: { userId },
+      include: {
+        lab: {
+          select: {
+            name: true,
+            building: true,
+            floor: true
+          }
+        },
+        semesterObj: {
+          select: {
+            name: true,
+            startDate: true,
+            endDate: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
     res.status(200).json({
       success: true,
@@ -32,7 +47,7 @@ export const getMyRecurringReservations = async (req: Request, res: Response, ne
 };
 
 // Crear una nueva reserva recurrente
-export const createRecurringReservation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const createRecurringReservation = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?.id;
     
@@ -79,13 +94,17 @@ export const createRecurringReservation = async (req: Request, res: Response, ne
     }
 
     // Validar que el cuatrimestre existe
-    const semesterData = await Semester.findById(semester);
+    const semesterData = await prisma.semester.findUnique({
+      where: { id: semester }
+    });
     if (!semesterData) {
       throw new AppError('Cuatrimestre no encontrado', 404);
     }
 
     // Validar capacidad del aula
-    const lab = await Lab.findById(labId);
+    const lab = await prisma.lab.findUnique({
+      where: { id: labId }
+    });
     if (!lab) {
       throw new AppError('Laboratorio no encontrado', 404);
     }
@@ -94,19 +113,32 @@ export const createRecurringReservation = async (req: Request, res: Response, ne
     }
 
     // Crear la reserva recurrente
-    const reservation = await RecurringReservation.create({
-      userId,
-      labId,
-      dayOfWeek,
-      startTime,
-      endTime,
-      semester,
-      purpose,
-      attendees
+    const reservation = await prisma.recurringReservation.create({
+      data: {
+        userId,
+        labId,
+        dayOfWeek,
+        startTime,
+        endTime,
+        semester,
+        purpose,
+        attendees
+      },
+      include: {
+        lab: {
+          select: {
+            name: true,
+            building: true,
+            floor: true
+          }
+        },
+        semesterObj: {
+          select: {
+            name: true
+          }
+        }
+      }
     });
-
-    await reservation.populate('lab', 'name building floor');
-    await reservation.populate('semester', 'name');
 
     res.status(201).json({
       success: true,
@@ -118,7 +150,7 @@ export const createRecurringReservation = async (req: Request, res: Response, ne
 };
 
 // Eliminar una reserva recurrente
-export const deleteRecurringReservation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const deleteRecurringReservation = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?.id;
     const { id } = req.params;
@@ -128,17 +160,21 @@ export const deleteRecurringReservation = async (req: Request, res: Response, ne
     }
 
     // Verificar que la reserva pertenece al usuario
-    const reservation = await RecurringReservation.findById(id);
+    const reservation = await prisma.recurringReservation.findUnique({
+      where: { id }
+    });
     
     if (!reservation) {
       throw new AppError('Reserva no encontrada', 404);
     }
 
-    if (reservation.userId.toString() !== userId) {
+    if (reservation.userId !== userId) {
       throw new AppError('No tienes permisos para eliminar esta reserva', 403);
     }
 
-    await RecurringReservation.findByIdAndDelete(id);
+    await prisma.recurringReservation.delete({
+      where: { id }
+    });
 
     res.status(200).json({
       success: true,
@@ -150,7 +186,7 @@ export const deleteRecurringReservation = async (req: Request, res: Response, ne
 };
 
 // Toggle activa/inactiva una reserva recurrente
-export const toggleRecurringReservation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const toggleRecurringReservation = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?.id;
     const { id } = req.params;
@@ -159,28 +195,28 @@ export const toggleRecurringReservation = async (req: Request, res: Response, ne
       throw new AppError('Usuario no autenticado', 401);
     }
 
-    const reservation = await RecurringReservation.findById(id);
+    const reservation = await prisma.recurringReservation.findUnique({
+      where: { id }
+    });
     
     if (!reservation) {
       throw new AppError('Reserva no encontrada', 404);
     }
 
-    if (reservation.userId.toString() !== userId) {
+    if (reservation.userId !== userId) {
       throw new AppError('No tienes permisos para modificar esta reserva', 403);
     }
 
-    reservation.isActive = !reservation.isActive;
-    await reservation.save();
+    const updatedReservation = await prisma.recurringReservation.update({
+      where: { id },
+      data: { isActive: !reservation.isActive }
+    });
 
     res.status(200).json({
       success: true,
-      data: reservation
+      data: updatedReservation
     });
   } catch (error) {
     next(error);
   }
 };
-
-
-
-

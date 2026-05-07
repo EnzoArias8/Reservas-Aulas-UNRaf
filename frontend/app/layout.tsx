@@ -9,7 +9,12 @@ import { Toaster } from "@/components/ui/toaster"
 export const metadata = {
   title: "Reservas de Aulas - UNRaf",
   description: "Reservas de aulas para fines académicos y de investigación",
-    generator: 'v0.dev'
+  generator: 'v0.dev',
+  icons: {
+    icon: '/icono.jpg',
+    shortcut: '/icono.jpg',
+    apple: '/icono.jpg',
+  }
 }
 
 export default function RootLayout({

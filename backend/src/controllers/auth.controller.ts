@@ -3,7 +3,7 @@
 // ============================================
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/User.model';
+import prisma from '../utils/prisma';
 import { AppError } from '../utils/AppError';
 import { 
   generateAccessToken, 
@@ -11,6 +11,7 @@ import {
   sendTokenResponse 
 } from '../utils/jwt.utils';
 import { AuthRequest } from '../middleware/auth.middleware';
+import bcrypt from 'bcryptjs';
 
 export const register = async (
   req: Request,
@@ -21,22 +22,26 @@ export const register = async (
     const { nombre, apellido, email, password, role } = req.body;
 
     // Verificar si el usuario ya existe
-    const existingUser = await User.findOne({ email });
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
     if (existingUser) {
       throw new AppError('El email ya está registrado', 400);
     }
 
     // Crear usuario
-    const user = await User.create({
-      nombre,
-      apellido,
-      email,
-      password,
-      role: role || 'Profesor'
+    const user = await prisma.user.create({
+      data: {
+        nombre,
+        apellido,
+        email,
+        password,
+        role: role || 'Profesor'
+      }
     });
 
     // Generar tokens y enviar respuesta
-    sendTokenResponse(user as InstanceType<typeof User> & { _id: string }, 201, res);
+    sendTokenResponse(user, 201, res);
   } catch (error) {
     next(error);
   }
@@ -50,162 +55,22 @@ export const login = async (
   try {
     const { email, password } = req.body;
 
-    // Buscar usuario con password
-    const user = await User.findOne({ email }).select('+password') as (InstanceType<typeof User> & { _id: string });
-
-    if (!user) {
-      throw new AppError('Credenciales inválidas', 401);
+    // Verificar si el email y password fueron proporcionados
+    if (!email || !password) {
+      throw new AppError('Por favor ingresa email y contraseña', 400);
     }
 
-    // Verificar contraseña
-    const isPasswordCorrect = await user.comparePassword(password);
-
-    if (!isPasswordCorrect) {
-      throw new AppError('Credenciales inválidas', 401);
-    }
-
-    if (!user.isActive) {
-      throw new AppError('Tu cuenta necesita ser validada por un administrador', 401);
-    }
-
-    // Generar refresh token y guardarlo
-    const refreshToken = generateRefreshToken(user._id.toString());
-    user.refreshToken = refreshToken;
-    await user.save({ validateBeforeSave: false });
-
-    // Enviar respuesta con tokens
-    sendTokenResponse(user, 200, res, refreshToken);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const logout = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    // Limpiar refresh token del usuario
-    if (req.user) {
-      await User.findByIdAndUpdate(req.user.id, { refreshToken: undefined });
-    }
-
-    // Limpiar cookies
-    res.cookie('token', 'none', {
-      expires: new Date(Date.now() + 10 * 1000),
-      httpOnly: true
+    // Buscar usuario incluyendo password
+    const user = await prisma.user.findUnique({
+      where: { email }
     });
 
-    res.cookie('refreshToken', 'none', {
-      expires: new Date(Date.now() + 10 * 1000),
-      httpOnly: true
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Sesión cerrada exitosamente',
-      data: null
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getMe = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    if (!req.user) {
-      throw new AppError('No autorizado', 401);
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      throw new AppError('Email o contraseña incorrectos', 401);
     }
 
-    const user = await User.findById(req.user.id);
-
-    res.status(200).json({
-      success: true,
-      message: 'Usuario obtenido exitosamente',
-      data: user
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const updateProfile = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const allowedFields = ['nombre', 'apellido', 'telefono'];
-    const updates: any = {};
-
-    Object.keys(req.body).forEach(key => {
-      if (allowedFields.includes(key)) {
-        updates[key] = req.body[key];
-      }
-    });
-
-    if (!req.user) {
-      throw new AppError('No autorizado', 401);
-    }
-
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      updates,
-      {
-        new: true,
-        runValidators: true
-      }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Perfil actualizado exitosamente',
-      data: user
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const changePassword = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!req.user) {
-      throw new AppError('No autorizado', 401);
-    }
-
-    const user = await User.findById(req.user.id).select('+password');
-
-    if (!user) {
-      throw new AppError('Usuario no encontrado', 404);
-    }
-
-    // Verificar contraseña actual
-    const isPasswordCorrect = await user.comparePassword(currentPassword);
-
-    if (!isPasswordCorrect) {
-      throw new AppError('Contraseña actual incorrecta', 401);
-    }
-
-    // Actualizar contraseña
-    user.password = newPassword;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Contraseña actualizada exitosamente',
-      data: null
-    });
+    // Generar tokens y enviar respuesta
+    sendTokenResponse(user, 200, res);
   } catch (error) {
     next(error);
   }
@@ -220,35 +85,187 @@ export const refreshToken = async (
     const { refreshToken } = req.body;
 
     if (!refreshToken) {
-      throw new AppError('Refresh token no proporcionado', 401);
+      throw new AppError('Refresh token no proporcionado', 400);
     }
 
     // Verificar refresh token
-    const decoded = jwt.verify(
-      refreshToken,
-      process.env.JWT_REFRESH_SECRET!
-    ) as { id: string };
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET!) as { id: string };
 
     // Buscar usuario
-    const user = await User.findById(decoded.id).select('+refreshToken') as (InstanceType<typeof User> & { _id: string });
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id }
+    });
 
-    if (!user || user.refreshToken !== refreshToken) {
-      throw new AppError('Refresh token inválido', 401);
+    if (!user) {
+      throw new AppError('Usuario no encontrado', 404);
     }
 
-    if (!user.isActive) {
-      throw new AppError('Tu cuenta necesita ser validada por un administrador', 401);
-    }
+    // Generar nuevos tokens
+    const newAccessToken = generateAccessToken(user.id);
+    const newRefreshToken = generateRefreshToken(user.id);
 
-    // Generar nuevo access token
-    const newAccessToken = generateAccessToken(user._id.toString());
+    // Actualizar refresh token en la base de datos
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken: newRefreshToken }
+    });
 
     res.status(200).json({
       success: true,
-      message: 'Token renovado exitosamente',
-      data: {
-        accessToken: newAccessToken
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+
+    res.status(200).json({
+      success: true,
+      message: 'Sesión cerrada exitosamente'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMe = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new AppError('Usuario no autenticado', 401);
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        nombre: true,
+        apellido: true,
+        email: true,
+        role: true,
+        telefono: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true
       }
+    });
+
+    if (!user) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateProfile = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { nombre, apellido, telefono } = req.body;
+
+    if (!userId) {
+      throw new AppError('Usuario no autenticado', 401);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(nombre !== undefined && { nombre }),
+        ...(apellido !== undefined && { apellido }),
+        ...(telefono !== undefined && { telefono })
+      },
+      select: {
+        id: true,
+        nombre: true,
+        apellido: true,
+        email: true,
+        role: true,
+        telefono: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Perfil actualizado exitosamente',
+      data: updatedUser
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const changePassword = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!userId) {
+      throw new AppError('Usuario no autenticado', 401);
+    }
+
+    if (!currentPassword || !newPassword) {
+      throw new AppError('La contraseña actual y la nueva son requeridas', 400);
+    }
+
+    // Obtener usuario con contraseña
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+
+    // Verificar contraseña actual
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      throw new AppError('La contraseña actual es incorrecta', 400);
+    }
+
+    // Encriptar nueva contraseña
+    const salt = await bcrypt.genSalt(10);
+    const hashedNewPassword = await bcrypt.hash(newPassword, salt);
+
+    // Actualizar contraseña
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedNewPassword }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Contraseña actualizada exitosamente'
     });
   } catch (error) {
     next(error);

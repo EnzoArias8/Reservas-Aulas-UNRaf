@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  nombre       String
+  apellido     String
+  email        String    @unique
+  password     String
+  role         Role      @default(Profesor)
+  telefono     String?
+  isActive     Boolean   @default(false)
+  refreshToken String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  reservations               Reservation[]
+  recurringReservations      RecurringReservation[]
+
+  @@map("users")
+}
+
+model Lab {
+  id        String   @id @default(cuid())
+  name      String
+  building  String
+  floor     String
+  capacity  Int
+  equipment String[]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  reservations               Reservation[]
+  recurringReservations      RecurringReservation[]
+
+  @@unique([name, building])
+  @@map("labs")
+}
+
+model Reservation {
+  id        String           @id @default(cuid())
+  userId    String
+  labId     String
+  date      DateTime
+  timeSlot  String
+  purpose   String?
+  attendees  Int
+  status    ReservationStatus @default(confirmed)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lab  Lab  @relation(fields: [labId], references: [id], onDelete: Cascade)
+
+  @@unique([date, timeSlot, labId])
+  @@map("reservations")
+}
+
+model RecurringReservation {
+  id        String   @id @default(cuid())
+  userId    String
+  labId     String
+  dayOfWeek Int      // 0 = Domingo, 1 = Lunes, etc.
+  startTime String
+  endTime   String
+  semester  String
+  purpose   String?
+  attendees Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lab     Lab      @relation(fields: [labId], references: [id], onDelete: Cascade)
+  semesterObj Semester @relation(fields: [semester], references: [id], onDelete: Cascade)
+
+  @@map("recurring_reservations")
+}
+
+model Semester {
+  id        String   @id @default(cuid())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  year      Int
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  recurringReservations RecurringReservation[]
+  examWeeks             ExamWeek[]
+
+  @@unique([isActive])
+  @@map("semesters")
+}
+
+model Holiday {
+  id          String      @id @default(cuid())
+  name        String
+  date        DateTime
+  type        HolidayType
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("holidays")
+}
+
+model ExamWeek {
+  id        String   @id @default(cuid())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  semester  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  semesterObj Semester @relation(fields: [semester], references: [id], onDelete: Cascade)
+
+  @@map("exam_weeks")
+}
+
+enum Role {
+  Profesor
+  Investigador
+  Admin
+}
+
+enum ReservationStatus {
+  confirmed
+  completed
+}
+
+enum HolidayType {
+  national
+  academic
+  university
+}

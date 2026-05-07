@@ -1,11 +1,5 @@
-
 import { Request, Response, NextFunction } from 'express';
-import { Lab } from '../models/Lab.model';
-import { Reservation } from '../models/Reservation.model';
-import { RecurringReservation } from '../models/RecurringReservation.model';
-import { Semester } from '../models/Semester.model';
-import { Holiday } from '../models/Holiday.model';
-import { ExamWeek } from '../models/ExamWeek.model';
+import prisma from '../utils/prisma';
 import { AppError } from '../utils/AppError';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -20,10 +14,13 @@ export const getAllLabs = async (
     const filter: any = {};
 
     if (building) filter.building = building;
-    if (capacity) filter.capacity = { $gte: Number(capacity) };
+    if (capacity) filter.capacity = { gte: Number(capacity) };
     if (isActive !== undefined) filter.isActive = isActive === 'true';
 
-    const labs = await Lab.find(filter).sort({ name: 1 });
+    const labs = await prisma.lab.findMany({
+      where: filter,
+      orderBy: { name: 'asc' }
+    });
 
     res.status(200).json({
       success: true,
@@ -42,7 +39,9 @@ export const getLabById = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const lab = await Lab.findById(req.params.id);
+    const lab = await prisma.lab.findUnique({
+      where: { id: req.params.id }
+    });
 
     if (!lab) {
       throw new AppError('Laboratorio no encontrado', 404);
@@ -64,7 +63,9 @@ export const createLab = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const lab = await Lab.create(req.body);
+    const lab = await prisma.lab.create({
+      data: req.body
+    });
 
     res.status(201).json({
       success: true,
@@ -82,18 +83,10 @@ export const updateLab = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const lab = await Lab.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true
-      }
-    );
-
-    if (!lab) {
-      throw new AppError('Laboratorio no encontrado', 404);
-    }
+    const lab = await prisma.lab.update({
+      where: { id: req.params.id },
+      data: req.body
+    });
 
     res.status(200).json({
       success: true,
@@ -111,17 +104,21 @@ export const deleteLab = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const lab = await Lab.findById(req.params.id);
+    const lab = await prisma.lab.findUnique({
+      where: { id: req.params.id }
+    });
 
     if (!lab) {
       throw new AppError('Laboratorio no encontrado', 404);
     }
 
     // Verificar si hay reservas activas
-    const activeReservations = await Reservation.countDocuments({
-      labId: req.params.id,
-      date: { $gte: new Date() },
-      status: { $in: ['pending', 'confirmed'] }
+    const activeReservations = await prisma.reservation.count({
+      where: {
+        labId: req.params.id,
+        date: { gte: new Date() },
+        status: { in: ['confirmed'] }
+      }
     });
 
     if (activeReservations > 0) {
@@ -131,7 +128,9 @@ export const deleteLab = async (
       );
     }
 
-    await lab.deleteOne();
+    await prisma.lab.delete({
+      where: { id: req.params.id }
+    });
 
     res.status(200).json({
       success: true,
@@ -157,7 +156,9 @@ export const getAvailableTimeSlots = async (
     }
 
     // Verificar que el laboratorio existe
-    const lab = await Lab.findById(id);
+    const lab = await prisma.lab.findUnique({
+      where: { id }
+    });
     if (!lab) {
       throw new AppError('Laboratorio no encontrado', 404);
     }
@@ -189,10 +190,11 @@ export const getAvailableTimeSlots = async (
 
     // Domingos: no hay horarios disponibles
     if (dow === 0) {
-      return res.status(200).json({ 
+      res.status(200).json({ 
         success: true, 
         data: { availableSlots: [], allSlots: [] } 
       });
+      return;
     }
 
     // Verificar si es feriado: no hay horarios disponibles
@@ -201,18 +203,21 @@ export const getAvailableTimeSlots = async (
     const nextDay = new Date(normalizedDate);
     nextDay.setUTCDate(nextDay.getUTCDate() + 1);
     
-    const holiday = await Holiday.findOne({
-      date: {
-        $gte: normalizedDate,
-        $lt: nextDay
+    const holiday = await prisma.holiday.findFirst({
+      where: {
+        date: {
+          gte: normalizedDate,
+          lt: nextDay
+        }
       }
     });
     
     if (holiday) {
-      return res.status(200).json({ 
+      res.status(200).json({ 
         success: true, 
         data: { availableSlots: [], allSlots: [] } 
       });
+      return;
     }
 
     // Generar horarios posibles según el día de la semana
@@ -237,10 +242,12 @@ export const getAvailableTimeSlots = async (
     }
 
     // Obtener reservas existentes para este laboratorio en esta fecha
-    const existingReservations = await Reservation.find({
-      labId: id,
-      date: date,
-      status: { $in: ['confirmed'] }
+    const existingReservations = await prisma.reservation.findMany({
+      where: {
+        labId: id,
+        date: new Date(String(date)),
+        status: 'confirmed'
+      }
     });
 
     // Obtener reservas recurrentes que apliquen para este día
@@ -250,15 +257,17 @@ export const getAvailableTimeSlots = async (
     const nextRecDay = new Date(normalizedRecDate);
     nextRecDay.setUTCDate(nextRecDay.getUTCDate() + 1);
     
-    const isInExamWeek = await ExamWeek.findOne({
-      startDate: { $lte: nextRecDay },
-      endDate: { $gte: normalizedRecDate }
+    const isInExamWeek = await prisma.examWeek.findFirst({
+      where: {
+        startDate: { lte: nextRecDay },
+        endDate: { gte: normalizedRecDate }
+      }
     });
 
-    let recurring = [];
+    let recurring: any[] = [];
     // Solo obtener reservas recurrentes si NO estamos en una semana de examen
     if (!isInExamWeek) {
-      const active = await Semester.find({ isActive: true });
+      const active = await prisma.semester.findMany({ where: { isActive: true } });
       const activeIds = active
         .filter(s => {
           const d = new Date(dt.toISOString().split('T')[0]);
@@ -266,8 +275,15 @@ export const getAvailableTimeSlots = async (
           const end = new Date(new Date(s.endDate).toISOString().split('T')[0]);
           return d >= start && d <= end;
         })
-        .map(s => s._id);
-      recurring = await RecurringReservation.find({ labId: id, dayOfWeek: dow, semester: { $in: activeIds }, isActive: true });
+        .map(s => s.id);
+      recurring = await prisma.recurringReservation.findMany({ 
+        where: { 
+          labId: id, 
+          dayOfWeek: dow, 
+          semester: { in: activeIds }, 
+          isActive: true 
+        } 
+      });
     }
 
     // Función para verificar si un slot está disponible

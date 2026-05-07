@@ -1,10 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { Reservation, IReservation } from '../models/Reservation.model';
-import { Lab, ILab } from '../models/Lab.model';
-import { RecurringReservation } from '../models/RecurringReservation.model';
-import { Semester } from '../models/Semester.model';
-import { Holiday } from '../models/Holiday.model';
-import { ExamWeek } from '../models/ExamWeek.model';
+import prisma from '../utils/prisma';
 import { AppError } from '../utils/AppError';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -27,7 +22,12 @@ function getDayOfWeekFromDateString(dateString: string): number {
 // Función para crear una nueva reserva
 export const createReservation = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    const userId = req.user?.id;
     const { labId, date, timeSlot, purpose, attendees } = req.body;
+
+    if (!userId) {
+      throw new AppError('Usuario no autenticado', 401);
+    }
 
     // 1. Validación de fecha: Evita reservas en el pasado
     const reservationDate = new Date(date);
@@ -47,10 +47,12 @@ export const createReservation = async (req: AuthRequest, res: Response, next: N
     const nextDay = new Date(normalizedDate);
     nextDay.setUTCDate(nextDay.getUTCDate() + 1);
     
-    const holiday = await Holiday.findOne({
-      date: {
-        $gte: normalizedDate,
-        $lt: nextDay
+    const holiday = await prisma.holiday.findFirst({
+      where: {
+        date: {
+          gte: normalizedDate,
+          lt: nextDay
+        }
       }
     });
     
@@ -92,395 +94,145 @@ export const createReservation = async (req: AuthRequest, res: Response, next: N
     const searchDateEnd = new Date(reservationDate);
     searchDateEnd.setHours(23, 59, 59, 999);
     
-    const existingReservations = await Reservation.find({
-      labId,
-      date: {
-        $gte: searchDateStart,
-        $lte: searchDateEnd
-      },
-      status: { $in: ['confirmed'] }
+    const existingReservations = await prisma.reservation.findMany({
+      where: {
+        labId,
+        date: {
+          gte: searchDateStart,
+          lte: searchDateEnd
+        },
+        status: 'confirmed'
+      }
     });
 
-    for (const reservation of existingReservations) {
-      const [existingStart, existingEnd] = reservation.timeSlot.split(' - ');
+    // Verificar superposición con reservas existentes
+    for (const existing of existingReservations) {
+      const [existingStart, existingEnd] = existing.timeSlot.split(' - ');
       const [existingStartHour, existingStartMinute] = existingStart.split(':').map(Number);
       const [existingEndHour, existingEndMinute] = existingEnd.split(':').map(Number);
       
       const existingStartMinutes = existingStartHour * 60 + existingStartMinute;
       const existingEndMinutes = existingEndHour * 60 + existingEndMinute;
 
-      // Verificar superposición: dos rangos se superponen si NO están completamente separados
-      // Se superponen si: startMinutes < existingEndMinutes && endMinutes > existingStartMinutes
+      // Si hay superposición, rechazar la reserva
       if (startMinutes < existingEndMinutes && endMinutes > existingStartMinutes) {
-        return next(new AppError(
-          `Este laboratorio ya está reservado en un horario que se superpone: ${reservation.timeSlot}. Por favor, selecciona otro horario que no se superponga.`, 
-          409
-        ));
+        return next(new AppError('El horario seleccionado ya está reservado. Por favor, elige otro horario.', 400));
       }
     }
 
-    // 2.b Validar superposición con reservas recurrentes activas
-    // IMPORTANTE: Las reservas recurrentes NO se aplican durante semanas de examen
-    // Obtener el día de la semana de manera segura para evitar problemas de zona horaria
-    let dayOfWeek: number;
-    try {
-      dayOfWeek = getDayOfWeekFromDateString(date);
-    } catch (error: any) {
-      return next(new AppError(error.message || 'Formato de fecha inválido', 400));
+    // 3. Validación de día de la semana y horarios especiales
+    const dow = getDayOfWeekFromDateString(date);
+    
+    // No permitir reservas los domingos
+    if (dow === 0) {
+      return next(new AppError('No se permiten reservas los domingos.', 400));
     }
-    
-    const targetDate = new Date(reservationDate);
-    
-    // Verificar si la fecha está en una semana de examen
-    // Normalizar fecha a medianoche UTC para comparar solo el día
-    const normalizedExamDate = new Date(targetDate);
-    normalizedExamDate.setUTCHours(0, 0, 0, 0);
-    const nextExamDay = new Date(normalizedExamDate);
-    nextExamDay.setUTCDate(nextExamDay.getUTCDate() + 1);
-    
-    const isInExamWeek = await ExamWeek.findOne({
-      startDate: { $lte: nextExamDay },
-      endDate: { $gte: normalizedExamDate }
+
+    // Sábados: solo entre 08:00 y 12:00
+    if (dow === 6) {
+      const min = 8 * 60; // 08:00
+      const max = 12 * 60; // 12:00
+      if (startMinutes < min || endMinutes > max) {
+        return next(new AppError('Los sábados solo se permiten reservas entre 08:00 y 12:00.', 400));
+      }
+    }
+
+    // 4. Validar capacidad del laboratorio
+    const lab = await prisma.lab.findUnique({
+      where: { id: labId }
     });
-
-    // Solo verificar reservas recurrentes si NO estamos en una semana de examen
-    if (!isInExamWeek) {
-      // Parsear la fecha string para comparar con los semestres
-      const dateParts = date.split('-');
-      const year = parseInt(dateParts[0], 10);
-      const month = parseInt(dateParts[1], 10) - 1;
-      const day = parseInt(dateParts[2], 10);
-      const targetDateLocal = new Date(year, month, day);
-      
-      const activeSemesters = await Semester.find({ isActive: true });
-      const activeSemesterIds = activeSemesters
-        .filter(s => {
-          // Normalizar fechas del semestre a medianoche local para comparar
-          const semesterStart = new Date(s.startDate);
-          semesterStart.setHours(0, 0, 0, 0);
-          const semesterEnd = new Date(s.endDate);
-          semesterEnd.setHours(0, 0, 0, 0);
-          
-          return targetDateLocal >= semesterStart && targetDateLocal <= semesterEnd;
-        })
-        .map(s => s._id);
-
-      if (activeSemesterIds.length > 0) {
-        const recs = await RecurringReservation.find({ 
-          labId, 
-          dayOfWeek, 
-          semester: { $in: activeSemesterIds }, 
-          isActive: true 
-        });
-        
-        for (const r of recs) {
-          const [rStartH, rStartM] = r.startTime.split(':').map(Number);
-          const [rEndH, rEndM] = r.endTime.split(':').map(Number);
-          const recStart = rStartH * 60 + rStartM;
-          const recEnd = rEndH * 60 + rEndM;
-          
-          // Verificar superposición: dos rangos se superponen si se cruzan
-          // Se superponen si: startMinutes < recEnd && endMinutes > recStart
-          if (startMinutes < recEnd && endMinutes > recStart) {
-            return next(new AppError(
-              `Este horario se superpone con una reserva recurrente activa (${r.startTime} - ${r.endTime}).`, 
-              409
-            ));
-          }
-        }
-      }
-    }
-
-    // 3. Validación de capacidad
-    const lab: ILab | null = await Lab.findById(labId);
     if (!lab) {
-      return next(new AppError('Laboratorio no encontrado.', 404));
+      return next(new AppError('Laboratorio no encontrado', 404));
     }
-
     if (attendees > lab.capacity) {
       return next(new AppError(`El número de asistentes excede la capacidad máxima del laboratorio (${lab.capacity}).`, 400));
     }
 
-    // Crear la reserva confirmada automáticamente
-    const newReservation = new Reservation({
-      userId: req.user?.id,
-      labId,
-      date: reservationDate,
-      timeSlot,
-      purpose,
-      attendees,
-      status: 'confirmed' // Estado inicial de la reserva (confirmada automáticamente)
+    // 5. Validar conflicto con reservas recurrentes
+    // Solo aplicar si NO estamos en una semana de examen
+    const normalizedRecDate = new Date(reservationDate);
+    normalizedRecDate.setUTCHours(0, 0, 0, 0);
+    const nextRecDay = new Date(normalizedRecDate);
+    nextRecDay.setUTCDate(nextRecDay.getUTCDate() + 1);
+    
+    const isInExamWeek = await prisma.examWeek.findFirst({
+      where: {
+        startDate: { lte: nextRecDay },
+        endDate: { gte: normalizedRecDate }
+      }
     });
 
-    await newReservation.save();
-
-    // Poblar el lab antes de devolver la respuesta
-    await newReservation.populate('labId', 'name building floor capacity equipment');
-    await newReservation.populate('userId', 'email nombre apellido');
-
-    res.status(201).json({
-      success: true,
-      data: newReservation
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// Función para obtener una reserva específica por ID
-export const getReservationById = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user?.id;
-
-    console.log("🔍 Backend: Getting reservation by ID:", id, "for user:", userId);
-
-    const reservation = await Reservation.findById(id)
-      .populate('labId', 'name building floor capacity equipment')
-      .populate('userId', 'email');
-
-    if (!reservation) {
-      return next(new AppError('Reserva no encontrada', 404));
-    }
-
-    // Verificar que el usuario sea el propietario de la reserva o un admin
-    if (reservation.userId.toString() !== userId && req.user?.role !== 'Admin') {
-      return next(new AppError('No tienes permisos para acceder a esta reserva', 403));
-    }
-
-    res.status(200).json({
-      success: true,
-      data: reservation
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// Función para actualizar una reserva
-export const updateReservation = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const { date, timeSlot, purpose, attendees, status } = req.body;
-    const userId = req.user?.id;
-
-    console.log("🔧 Backend: Updating reservation:", id, "with data:", req.body);
-
-    const reservation = await Reservation.findById(id);
-
-    if (!reservation) {
-      return next(new AppError('Reserva no encontrada', 404));
-    }
-
-    // Verificar que el usuario sea el propietario de la reserva o un admin
-    if (reservation.userId.toString() !== userId && req.user?.role !== 'Admin') {
-      return next(new AppError('No tienes permisos para editar esta reserva', 403));
-    }
-
-    // Validar si se está cambiando la fecha
-    const isDateChanging = date && new Date(date).toISOString().split('T')[0] !== new Date(reservation.date).toISOString().split('T')[0];
-    const isTimeSlotChanging = timeSlot && timeSlot !== reservation.timeSlot;
-
-    if (isDateChanging) {
-      // Validar fecha pasada
-      const newDate = new Date(date);
-      newDate.setHours(0, 0, 0, 0);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (newDate < today) {
-        return next(new AppError('No se puede cambiar una reserva a una fecha pasada.', 400));
-      }
-
-      // Validar feriados
-      const normalizedDate = new Date(newDate);
-      normalizedDate.setUTCHours(0, 0, 0, 0);
-      const nextDay = new Date(normalizedDate);
-      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-      
-      const holiday = await Holiday.findOne({
-        date: {
-          $gte: normalizedDate,
-          $lt: nextDay
-        }
+    if (!isInExamWeek) {
+      // Buscar cuatrimestres activos que cubran esta fecha
+      const activeSemesters = await prisma.semester.findMany({ 
+        where: { isActive: true } 
       });
-      
-      if (holiday) {
-        return next(new AppError(`No se pueden hacer reservas en feriados. ${holiday.name}`, 400));
-      }
-    }
+      const activeIds = activeSemesters
+        .filter(s => {
+          const d = new Date(reservationDate.toISOString().split('T')[0]);
+          const start = new Date(new Date(s.startDate).toISOString().split('T')[0]);
+          const end = new Date(new Date(s.endDate).toISOString().split('T')[0]);
+          return d >= start && d <= end;
+        })
+        .map(s => s.id);
 
-    // Si se está cambiando la fecha o el horario, validar conflictos
-    if (isDateChanging || isTimeSlotChanging) {
-      const newDate = date ? new Date(date) : reservation.date;
-      const newTimeSlot = timeSlot || reservation.timeSlot;
-      const labId = reservation.labId;
-
-      // Validar formato del timeSlot
-      if (!newTimeSlot || !newTimeSlot.includes(' - ')) {
-        return next(new AppError('Formato de horario inválido. Debe ser "HH:MM - HH:MM"', 400));
-      }
-
-      // Parsear el nuevo timeSlot para obtener inicio y fin
-      const [startTime, endTime] = newTimeSlot.split(' - ');
-      if (!startTime || !endTime) {
-        return next(new AppError('Formato de horario inválido. Debe ser "HH:MM - HH:MM"', 400));
-      }
-      const [startHour, startMinute] = startTime.split(':').map(Number);
-      const [endHour, endMinute] = endTime.split(':').map(Number);
-      
-      // Validar que las horas y minutos sean números válidos
-      if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
-        return next(new AppError('Formato de horario inválido. Las horas y minutos deben ser números válidos.', 400));
-      }
-      
-      const startMinutes = startHour * 60 + startMinute;
-      const endMinutes = endHour * 60 + endMinute;
-      
-      // Validar que la hora de fin sea posterior a la hora de inicio
-      if (startMinutes >= endMinutes) {
-        return next(new AppError('La hora de fin debe ser posterior a la hora de inicio.', 400));
-      }
-
-      // Normalizar fecha para búsqueda
-      const searchDateStart = new Date(newDate);
-      searchDateStart.setHours(0, 0, 0, 0);
-      const searchDateEnd = new Date(newDate);
-      searchDateEnd.setHours(23, 59, 59, 999);
-
-      // Buscar reservas que se superpongan (excluyendo la reserva actual)
-      const overlappingReservations = await Reservation.find({
-        _id: { $ne: id }, // Excluir la reserva actual
-        labId: labId,
-        date: {
-          $gte: searchDateStart,
-          $lte: searchDateEnd
-        },
-        status: { $in: ['confirmed'] }
-      });
-
-      // Verificar si hay superposición con alguna reserva existente
-      for (const existingReservation of overlappingReservations) {
-        const [existingStartTime, existingEndTime] = existingReservation.timeSlot.split(' - ');
-        const [existingStartHour, existingStartMinute] = existingStartTime.split(':').map(Number);
-        const [existingEndHour, existingEndMinute] = existingEndTime.split(':').map(Number);
-        
-        const existingStartMinutes = existingStartHour * 60 + existingStartMinute;
-        const existingEndMinutes = existingEndHour * 60 + existingEndMinute;
-
-        // Verificar superposición
-        if ((startMinutes < existingEndMinutes && endMinutes > existingStartMinutes)) {
-          return next(new AppError(
-            `El horario ${newTimeSlot} en la fecha ${new Date(newDate).toISOString().split('T')[0]} ya está ocupado por otra reserva.`, 
-            400
-          ));
-        }
-      }
-
-      // Validar con reservas recurrentes activas (solo si NO estamos en semana de examen)
-      // Obtener el día de la semana de manera segura para evitar problemas de zona horaria
-      let dayOfWeek: number;
-      const dateString = typeof newDate === 'string' ? newDate : newDate.toISOString().split('T')[0];
-      try {
-        dayOfWeek = getDayOfWeekFromDateString(dateString);
-      } catch (error: any) {
-        return next(new AppError(error.message || 'Formato de fecha inválido', 400));
-      }
-      
-      const targetDate = new Date(newDate);
-      
-      const normalizedExamDate = new Date(targetDate);
-      normalizedExamDate.setUTCHours(0, 0, 0, 0);
-      const nextExamDay = new Date(normalizedExamDate);
-      nextExamDay.setUTCDate(nextExamDay.getUTCDate() + 1);
-      
-      const isInExamWeek = await ExamWeek.findOne({
-        startDate: { $lte: nextExamDay },
-        endDate: { $gte: normalizedExamDate }
-      });
-
-      if (!isInExamWeek) {
-        // Parsear la fecha string para comparar con los semestres
-        const dateParts = dateString.split('-');
-        const year = parseInt(dateParts[0], 10);
-        const month = parseInt(dateParts[1], 10) - 1;
-        const day = parseInt(dateParts[2], 10);
-        const targetDateLocal = new Date(year, month, day);
-        
-        const activeSemesters = await Semester.find({ isActive: true });
-        const activeSemesterIds = activeSemesters
-          .filter(s => {
-            // Normalizar fechas del semestre a medianoche local para comparar
-            const semesterStart = new Date(s.startDate);
-            semesterStart.setHours(0, 0, 0, 0);
-            const semesterEnd = new Date(s.endDate);
-            semesterEnd.setHours(0, 0, 0, 0);
-            
-            return targetDateLocal >= semesterStart && targetDateLocal <= semesterEnd;
-          })
-          .map(s => s._id);
-
-        const recurringReservations = await RecurringReservation.find({
-          labId: labId,
-          dayOfWeek: dayOfWeek,
-          semester: { $in: activeSemesterIds },
-          isActive: true
+      if (activeIds.length > 0) {
+        const conflictingRecurring = await prisma.recurringReservation.findMany({
+          where: {
+            labId,
+            dayOfWeek: dow,
+            semester: { in: activeIds },
+            isActive: true
+          }
         });
 
-        for (const recurring of recurringReservations) {
-          const [recurringStart, recurringEnd] = [recurring.startTime, recurring.endTime];
-          const [recurringStartHour, recurringStartMinute] = recurringStart.split(':').map(Number);
-          const [recurringEndHour, recurringEndMinute] = recurringEnd.split(':').map(Number);
+        for (const recurring of conflictingRecurring) {
+          const [rStartH, rStartM] = recurring.startTime.split(':').map(Number);
+          const [rEndH, rEndM] = recurring.endTime.split(':').map(Number);
+          const recStart = rStartH * 60 + rStartM;
+          const recEnd = rEndH * 60 + rEndM;
           
-          const recurringStartMinutes = recurringStartHour * 60 + recurringStartMinute;
-          const recurringEndMinutes = recurringEndHour * 60 + recurringEndMinute;
-
-          if (startMinutes < recurringEndMinutes && endMinutes > recurringStartMinutes) {
-            return next(new AppError(
-              `El horario se superpone con una reserva recurrente activa: ${recurringStart} - ${recurringEnd}`, 
-              409
-            ));
+          if (startMinutes < recEnd && endMinutes > recStart) {
+            return next(new AppError('Este horario entra en conflicto con una reserva recurrente existente.', 400));
           }
         }
       }
     }
 
-    // Validar capacidad si se están cambiando los asistentes
-    if (attendees) {
-      const lab = await Lab.findById(reservation.labId);
-      if (!lab) {
-        return next(new AppError('Laboratorio no encontrado.', 404));
+    // 6. Crear la reserva
+    const reservation = await prisma.reservation.create({
+      data: {
+        userId,
+        labId,
+        date: reservationDate,
+        timeSlot,
+        purpose,
+        attendees
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            nombre: true,
+            apellido: true,
+            email: true
+          }
+        },
+        lab: {
+          select: {
+            id: true,
+            name: true,
+            building: true,
+            floor: true,
+            capacity: true
+          }
+        }
       }
-      if (attendees > lab.capacity) {
-        return next(new AppError(`El número de asistentes excede la capacidad máxima del laboratorio (${lab.capacity}).`, 400));
-      }
-    }
+    });
 
-    // Actualizar los campos
-    if (date) {
-      const updatedDate = new Date(date);
-      updatedDate.setHours(0, 0, 0, 0);
-      reservation.date = updatedDate;
-    }
-    if (timeSlot) {
-      // Validar formato del timeSlot
-      if (!timeSlot.includes(' - ')) {
-        return next(new AppError('Formato de horario inválido. Debe ser "HH:MM - HH:MM"', 400));
-      }
-      reservation.timeSlot = timeSlot;
-    }
-    if (purpose !== undefined) reservation.purpose = purpose;
-    if (attendees) reservation.attendees = attendees;
-    if (status) reservation.status = status;
-
-    await reservation.save();
-
-    // Poblar los datos relacionados
-    await reservation.populate('labId', 'name building floor capacity equipment');
-    await reservation.populate('userId', 'email');
-
-    res.status(200).json({
+    res.status(201).json({
       success: true,
+      message: 'Reserva creada exitosamente',
       data: reservation
     });
   } catch (error) {
@@ -488,49 +240,264 @@ export const updateReservation = async (req: AuthRequest, res: Response, next: N
   }
 };
 
-// Función para obtener horarios disponibles para un laboratorio en una fecha específica
-export const getAvailableTimeSlotsForLab = async (req: AuthRequest, res: Response, next: NextFunction) => {
+// Obtener reservas del usuario autenticado
+export const getMyReservations = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { labId, date } = req.query;
+    const userId = req.user?.id;
     
-    if (!labId || !date) {
-      return next(new AppError('labId y date son requeridos', 400));
+    if (!userId) {
+      throw new AppError('Usuario no autenticado', 401);
     }
 
-    // Generar horarios posibles según el día de la semana
-    const allTimeSlots = [];
-    // Obtener el día de la semana de manera segura para evitar problemas de zona horaria
+    const { status, dateFrom, dateTo } = req.query as any;
+    const filter: any = { userId };
+    if (status) filter.status = status;
+    if (dateFrom || dateTo) {
+      filter.date = {};
+      if (dateFrom) filter.date.gte = new Date(dateFrom);
+      if (dateTo) filter.date.lte = new Date(dateTo);
+    }
+
+    const reservations = await prisma.reservation.findMany({
+      where: filter,
+      include: {
+        lab: {
+          select: {
+            id: true,
+            name: true,
+            building: true,
+            floor: true,
+            capacity: true
+          }
+        }
+      },
+      orderBy: { date: 'desc' }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: reservations
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Obtener todas las reservas (para admin)
+export const getReservations = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { status, labId, dateFrom, dateTo, userId } = req.query as any;
+    const filter: any = {};
+    if (status) filter.status = status;
+    if (labId) filter.labId = labId;
+    if (userId) filter.userId = userId;
+    if (dateFrom || dateTo) {
+      filter.date = {};
+      if (dateFrom) filter.date.gte = new Date(dateFrom);
+      if (dateTo) filter.date.lte = new Date(dateTo);
+    }
+
+    const reservations = await prisma.reservation.findMany({
+      where: filter,
+      include: {
+        user: {
+          select: {
+            id: true,
+            nombre: true,
+            apellido: true,
+            email: true
+          }
+        },
+        lab: {
+          select: {
+            id: true,
+            name: true,
+            building: true,
+            floor: true,
+            capacity: true
+          }
+        }
+      },
+      orderBy: { date: 'desc' }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: reservations
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Actualizar una reserva
+export const updateReservation = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const { purpose, attendees } = req.body;
+
+    if (!userId) {
+      throw new AppError('Usuario no autenticado', 401);
+    }
+
+    // Verificar que la reserva existe y pertenece al usuario
+    const reservation = await prisma.reservation.findUnique({
+      where: { id }
+    });
+
+    if (!reservation) {
+      throw new AppError('Reserva no encontrada', 404);
+    }
+
+    if (reservation.userId !== userId) {
+      throw new AppError('No tienes permisos para modificar esta reserva', 403);
+    }
+
+    // Validar capacidad si se actualiza el número de asistentes
+    if (attendees !== undefined) {
+      const lab = await prisma.lab.findUnique({
+        where: { id: reservation.labId }
+      });
+      if (lab && attendees > lab.capacity) {
+        throw new AppError(`El número de asistentes excede la capacidad máxima del laboratorio (${lab.capacity}).`, 400);
+      }
+    }
+
+    const updatedReservation = await prisma.reservation.update({
+      where: { id },
+      data: {
+        ...(purpose !== undefined && { purpose }),
+        ...(attendees !== undefined && { attendees })
+      },
+      include: {
+        lab: {
+          select: {
+            id: true,
+            name: true,
+            building: true,
+            floor: true,
+            capacity: true
+          }
+        }
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Reserva actualizada exitosamente',
+      data: updatedReservation
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Cancelar una reserva
+export const cancelReservation = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+
+    if (!userId) {
+      throw new AppError('Usuario no autenticado', 401);
+    }
+
+    // Verificar que la reserva existe y pertenece al usuario
+    const reservation = await prisma.reservation.findUnique({
+      where: { id }
+    });
+
+    if (!reservation) {
+      throw new AppError('Reserva no encontrada', 404);
+    }
+
+    if (reservation.userId !== userId) {
+      throw new AppError('No tienes permisos para cancelar esta reserva', 403);
+    }
+
+    // No permitir cancelar reservas del pasado
+    const reservationDate = new Date(reservation.date);
+    reservationDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (reservationDate < today) {
+      throw new AppError('No se pueden cancelar reservas de fechas pasadas', 400);
+    }
+
+    await prisma.reservation.delete({
+      where: { id }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Reserva cancelada exitosamente'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Obtener horarios disponibles para un laboratorio en una fecha específica
+export const getAvailableTimeSlots = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { labId, date } = req.query;
+
+    if (!labId || !date) {
+      throw new AppError('El laboratorio y la fecha son requeridos', 400);
+    }
+
+    // Verificar que el laboratorio existe
+    const lab = await prisma.lab.findUnique({
+      where: { id: labId as string }
+    });
+    if (!lab) {
+      throw new AppError('Laboratorio no encontrado', 404);
+    }
+
+    const dt = new Date(String(date));
     let dow: number;
     try {
       dow = getDayOfWeekFromDateString(String(date));
     } catch (error: any) {
-      return next(new AppError(error.message || 'Formato de fecha inválido', 400));
+      throw new AppError(error.message || 'Formato de fecha inválido', 400);
     }
-    const dt = new Date(String(date));
 
     // Domingos: no hay horarios disponibles
     if (dow === 0) {
-      return res.status(200).json({ success: true, data: { availableSlots: [], allSlots: [] } });
+      res.status(200).json({ 
+        success: true, 
+        data: { availableSlots: [], allSlots: [] } 
+      });
+      return;
     }
 
     // Verificar si es feriado: no hay horarios disponibles
-    // Normalizar fecha a medianoche UTC para comparar solo el día
     const normalizedDate = new Date(dt);
     normalizedDate.setUTCHours(0, 0, 0, 0);
     const nextDay = new Date(normalizedDate);
     nextDay.setUTCDate(nextDay.getUTCDate() + 1);
     
-    const holiday = await Holiday.findOne({
-      date: {
-        $gte: normalizedDate,
-        $lt: nextDay
+    const holiday = await prisma.holiday.findFirst({
+      where: {
+        date: {
+          gte: normalizedDate,
+          lt: nextDay
+        }
       }
     });
     
     if (holiday) {
-      return res.status(200).json({ success: true, data: { availableSlots: [], allSlots: [] } });
+      res.status(200).json({ 
+        success: true, 
+        data: { availableSlots: [], allSlots: [] } 
+      });
+      return;
     }
 
+    // Generar horarios posibles según el día de la semana
+    const allTimeSlots = [];
     const startHour = 8;
     const endHourExclusive = dow === 6 ? 12 : 23; // Sábado hasta 12:00, otros días hasta 23:00
 
@@ -551,29 +518,32 @@ export const getAvailableTimeSlotsForLab = async (req: AuthRequest, res: Respons
     }
 
     // Obtener reservas existentes para este laboratorio en esta fecha
-    const existingReservations = await Reservation.find({
-      labId: labId,
-      date: date,
-      status: { $in: ['confirmed'] }
+    const existingReservations = await prisma.reservation.findMany({
+      where: {
+        labId: labId as string,
+        date: new Date(String(date)),
+        status: 'confirmed'
+      }
     });
 
     // Obtener reservas recurrentes que apliquen para este día
     // IMPORTANTE: Las reservas recurrentes NO se aplican durante semanas de examen
-    // Normalizar fecha a medianoche UTC para comparar solo el día
     const normalizedRecDate = new Date(dt);
     normalizedRecDate.setUTCHours(0, 0, 0, 0);
     const nextRecDay = new Date(normalizedRecDate);
     nextRecDay.setUTCDate(nextRecDay.getUTCDate() + 1);
     
-    const isInExamWeek = await ExamWeek.findOne({
-      startDate: { $lte: nextRecDay },
-      endDate: { $gte: normalizedRecDate }
+    const isInExamWeek = await prisma.examWeek.findFirst({
+      where: {
+        startDate: { lte: nextRecDay },
+        endDate: { gte: normalizedRecDate }
+      }
     });
 
-    let recurring = [];
+    let recurring: any[] = [];
     // Solo obtener reservas recurrentes si NO estamos en una semana de examen
     if (!isInExamWeek) {
-      const active = await Semester.find({ isActive: true });
+      const active = await prisma.semester.findMany({ where: { isActive: true } });
       const activeIds = active
         .filter(s => {
           const d = new Date(dt.toISOString().split('T')[0]);
@@ -581,8 +551,15 @@ export const getAvailableTimeSlotsForLab = async (req: AuthRequest, res: Respons
           const end = new Date(new Date(s.endDate).toISOString().split('T')[0]);
           return d >= start && d <= end;
         })
-        .map(s => s._id);
-      recurring = await RecurringReservation.find({ labId: labId, dayOfWeek: dow, semester: { $in: activeIds }, isActive: true });
+        .map(s => s.id);
+      recurring = await prisma.recurringReservation.findMany({ 
+        where: { 
+          labId: labId as string, 
+          dayOfWeek: dow, 
+          semester: { in: activeIds }, 
+          isActive: true 
+        } 
+      });
     }
 
     // Función para verificar si un slot está disponible
@@ -631,122 +608,6 @@ export const getAvailableTimeSlotsForLab = async (req: AuthRequest, res: Respons
         availableSlots,
         allSlots: allTimeSlots
       }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getReservations = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { status, labId, dateFrom, dateTo, userId } = req.query as any;
-    const filter: any = {};
-    if (status) filter.status = status;
-    if (labId) filter.labId = labId;
-    if (userId) filter.userId = userId;
-    if (dateFrom || dateTo) {
-      filter.date = {};
-      if (dateFrom) filter.date.$gte = new Date(dateFrom);
-      if (dateTo) filter.date.$lte = new Date(dateTo);
-    }
-    const reservations = await Reservation.find(filter)
-      .populate('labId')
-      .populate('userId', 'email');
-    res.status(200).json({ success: true, data: reservations });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getMyReservations = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    if (!req.user) return next(new AppError('No autorizado', 401));
-    const reservations = await Reservation.find({ userId: req.user.id })
-      .populate('labId', 'name building floor capacity equipment')
-      .populate('userId', 'email nombre apellido');
-    
-    // Formatear las reservas para enviar upcoming y past separadas
-    const upcoming: any[] = [];
-    const past: any[] = [];
-    const now = new Date();
-    
-    reservations.forEach(reservation => {
-      const reservationObj = reservation.toObject();
-      // Normalizar el campo labId a lab para mantener compatibilidad con el frontend
-      if (reservationObj.labId) {
-        reservationObj.lab = reservationObj.labId;
-      }
-      if (new Date(reservation.date) >= now) {
-        upcoming.push(reservationObj);
-      } else {
-        past.push(reservationObj);
-      }
-    });
-    
-    res.status(200).json({ 
-      success: true, 
-      data: {
-        upcoming,
-        past
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const cancelReservation = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const reservation = await Reservation.findById(id);
-    
-    if (!reservation) {
-      throw new AppError('Reserva no encontrada', 404);
-    }
-
-    // Verificar que el usuario sea el propietario de la reserva o un admin
-    if (reservation.userId.toString() !== req.user?.id && req.user?.role !== 'Admin') {
-      throw new AppError('No tienes permisos para cancelar esta reserva', 403);
-    }
-
-    // Eliminar la reserva completamente de la base de datos
-    await Reservation.findByIdAndDelete(id);
-
-    res.status(200).json({
-      success: true,
-      message: 'Reserva cancelada y eliminada exitosamente'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// Función para eliminar definitivamente una reserva completada
-export const deleteReservation = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const reservation = await Reservation.findById(id);
-    
-    if (!reservation) {
-      throw new AppError('Reserva no encontrada', 404);
-    }
-
-    // Solo los admins pueden eliminar reservas
-    if (req.user?.role !== 'Admin') {
-      throw new AppError('Solo los administradores pueden eliminar reservas', 403);
-    }
-
-    // Solo se pueden eliminar reservas completadas
-    if (reservation.status !== 'completed') {
-      throw new AppError('Solo se pueden eliminar reservas completadas', 400);
-    }
-
-    // Eliminar la reserva completamente de la base de datos
-    await Reservation.findByIdAndDelete(id);
-
-    res.status(200).json({
-      success: true,
-      message: 'Reserva eliminada definitivamente'
     });
   } catch (error) {
     next(error);
