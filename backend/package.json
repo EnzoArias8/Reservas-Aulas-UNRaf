@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "node --max-old-space-size=4096 node_modules/nodemon/bin/nodemon.js",
-    "build": "tsc",
+    "build": "npx prisma generate && tsc",
     "start": "node dist/server.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "test": "jest --coverage",
     "lint": "eslint . --ext .ts",
-    "format": "prettier --write \"src/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\"",
+    "postinstall": "npx prisma generate"
   },
   "keywords": [
     "lab",
